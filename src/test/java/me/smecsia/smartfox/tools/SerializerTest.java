@@ -1,15 +1,23 @@
 package me.smecsia.smartfox.tools;
 
 import com.smartfoxserver.v2.entities.data.*;
+import me.smecsia.smartfox.tools.annotations.SFSCustomListItemDeserializer;
+import me.smecsia.smartfox.tools.annotations.SFSCustomListItemSerializer;
 import me.smecsia.smartfox.tools.annotations.SFSSerialize;
+import me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy;
 import me.smecsia.smartfox.tools.common.AbstractTransportObject;
+import me.smecsia.smartfox.tools.common.TransportObject;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 import static junit.framework.Assert.*;
+import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy.ALL_FIELDS;
+import static me.smecsia.smartfox.tools.util.SFSObjectUtil.safePutInt;
+import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
 
 /**
  * Copyright (c) 2012 i-Free. All Rights Reserved.
@@ -57,6 +65,43 @@ public class SerializerTest {
     }
 
     @Test
+    public void testSerializeCustom() {
+        Serializer serializerService = new Serializer();
+        Entity entity = new Entity();
+        List<Entity> list = new ArrayList<Entity>();
+        Entity subEntity = new Entity();
+        subEntity.setIntField(10);
+        list.add(subEntity);
+        entity.setWildcardList(list);
+
+        ISFSObject sObj = serializerService.serialize(entity);
+
+        assertNotNull(sObj.getSFSArray("wildcardList"));
+        Iterator<SFSDataWrapper> iterator = sObj.getSFSArray("wildcardList").iterator();
+        assertEquals(20, ((SFSObject) iterator.next().getObject()).getInt("intField").intValue());
+    }
+
+    @Test
+    public void testDeserializeCustom() {
+        Serializer serializerService = new Serializer();
+        ISFSObject entityObj = new SFSObject();
+        entityObj.putInt("intField", 10);
+        ISFSArray subArray = new SFSArray();
+        SFSObject subObj1 = new SFSObject();
+        subObj1.putLong("longField", 30L);
+        subArray.addSFSObject(subObj1);
+
+        entityObj.putSFSArray("wildcardList", subArray);
+
+        Entity entity = new Entity();
+        serializerService.deserialize(entity, entityObj);
+
+        assertNotNull("Wildcarded deserialized list must not be null!", entity.getWildcardList());
+        assertFalse("Wildcarded deserialized list must not be empty!", entity.getWildcardList().isEmpty());
+        assertEquals(30L, ((SubEntity) entity.getWildcardList().get(0)).getLongField().longValue());
+    }
+
+    @Test
     public void testSerialize() {
         Serializer serializerService = new Serializer();
 
@@ -84,8 +129,7 @@ public class SerializerTest {
         Iterator<SFSDataWrapper> iterator = sObj.getSFSArray("subEntities").iterator();
         assertEquals(100L, ((SFSObject) iterator.next().getObject()).getLong("longField").longValue());
 
-        assertEquals("testString", sObj.getSFSObject("subEntity").getSFSArray("stringsList").iterator().next()
-                .getObject().toString());
+        assertEquals("testString", sObj.getSFSObject("subEntity").getUtfStringArray("stringsList").iterator().next());
     }
 
 
@@ -121,19 +165,33 @@ public class SerializerTest {
 
     }
 
+    @SFSSerializeStrategy(type = ALL_FIELDS)
     public static class Entity extends AbstractTransportObject {
-        @SFSSerialize
         private Integer intField;
-        @SFSSerialize
         private String stringField;
-        @SFSSerialize
         private SubEntity subEntity;
-        @SFSSerialize
         private List<SubEntity> subEntities;
         @SFSSerialize(deserialize = false)
         private String notDeserializable;
         @SFSSerialize(serialize = false)
         private String notSerializable;
+        private List<? extends TransportObject> wildcardList;
+
+        @SFSCustomListItemDeserializer(listName = "wildcardList")
+        public TransportObject deserializeWildcardItem(ISFSObject object) {
+            SubEntity res = new SubEntity();
+            res.setLongField(object.getLong("longField"));
+            return res;
+        }
+
+        @SFSCustomListItemSerializer(listName = "wildcardList")
+        public ISFSObject serializeWildcardItem(TransportObject object) {
+            ISFSObject res = serialize(object);
+            if (object instanceof Entity) {
+                safePutInt(res, "intField", ((Entity) object).getIntField() * 2);
+            }
+            return res;
+        }
 
         public List<SubEntity> getSubEntities() {
             return subEntities;
@@ -181,6 +239,14 @@ public class SerializerTest {
 
         public void setNotDeserializable(String notDeserializable) {
             this.notDeserializable = notDeserializable;
+        }
+
+        public List<? extends TransportObject> getWildcardList() {
+            return wildcardList;
+        }
+
+        public void setWildcardList(List<? extends TransportObject> wildcardList) {
+            this.wildcardList = wildcardList;
         }
     }
 }

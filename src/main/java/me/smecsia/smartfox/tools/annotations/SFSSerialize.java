@@ -1,11 +1,9 @@
 package me.smecsia.smartfox.tools.annotations;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
+ * Copyright (c) 2012 i-Free. All Rights Reserved.
  *
  * @author Ilya Sadykov
  *         Date: 19.10.12
@@ -14,15 +12,28 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SFSSerialize {
-    /**
-     * Indicates whatever or not to serialize this field
-     * @return
-     */
     public boolean serialize() default true;
 
-    /**
-     * Indicates whatever or not to deserialize this field
-     * @return
-     */
     public boolean deserialize() default true;
+
+    public static final class DEFAULT {
+        public static SFSSerialize get() {
+            return new SFSSerialize() {
+                @Override
+                public boolean serialize() {
+                    return true;
+                }
+
+                @Override
+                public boolean deserialize() {
+                    return true;
+                }
+
+                @Override
+                public Class<? extends Annotation> annotationType() {
+                    return SFSSerialize.class;
+                }
+            };
+        }
+    }
 }
