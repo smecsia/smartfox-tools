@@ -31,8 +31,8 @@ public class AuthService extends BasicService {
             Security security = handler.getClass().getAnnotation(Security.class);
             AuthStrategy authStrategy = new AuthStrategy();
             try {
-                authStrategy.service = security.authService().newInstance();
-                authStrategy.authRequired = security.authRequired();
+                authStrategy.service = (security != null) ? security.authService().newInstance() : new AuthService();
+                authStrategy.authRequired = (security != null) && security.authRequired();
                 authCache.put(handler.getClass(), authStrategy);
             } catch (Exception e) {
                 throw new MetadataException(e);
