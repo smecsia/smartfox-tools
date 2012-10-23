@@ -8,7 +8,6 @@ import me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy;
 import me.smecsia.smartfox.tools.common.BasicService;
 import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.error.MetadataException;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
@@ -19,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy;
+import static me.smecsia.smartfox.tools.util.ClassUtil.*;
 import static me.smecsia.smartfox.tools.util.ExceptionUtil.formatStackTrace;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
 import static me.smecsia.smartfox.tools.util.TypesUtil.*;
@@ -89,27 +89,6 @@ public class Serializer extends BasicService {
             return entityFields;
         }
 
-
-        private Field[] getAllFields() {
-            Field[] fields = entityClass.getDeclaredFields();
-            Class superClass = entityClass.getSuperclass();
-            while (superClass != null) {
-                fields = (Field[]) ArrayUtils.addAll(fields, superClass.getDeclaredFields());
-                superClass = superClass.getSuperclass();
-            }
-            return fields;
-        }
-
-        private Method[] getAllMethods() {
-            Method[] methods = entityClass.getDeclaredMethods();
-            Class superClass = entityClass.getSuperclass();
-            while (superClass != null) {
-                methods = (Method[]) ArrayUtils.addAll(methods, superClass.getDeclaredMethods());
-                superClass = superClass.getSuperclass();
-            }
-            return methods;
-        }
-
         private Method findSetter(Field field) {
             try {
                 return entityClass.getMethod("set" + WordUtils.capitalize(field.getName()), field.getType());
@@ -164,10 +143,11 @@ public class Serializer extends BasicService {
 
         @SuppressWarnings("unchecked")
         private void readMetadata() {
-            final Field[] fields = getAllFields();
-            final Method[] methods = getAllMethods();
+            final Field[] fields = getFieldsInClassHierarchy(entityClass);
+            final Method[] methods = getMethodsInClassHierarchy(entityClass);
 
-            SFSSerializeStrategy sfsSerializeStrategy = entityClass.getAnnotation(SFSSerializeStrategy.class);
+            SFSSerializeStrategy sfsSerializeStrategy = findAnnotationInClassHierarchy(entityClass,
+                    SFSSerializeStrategy.class);
             if (sfsSerializeStrategy != null) {
                 this.serializeStrategy = sfsSerializeStrategy.type();
             } else {
