@@ -20,8 +20,6 @@ import static me.smecsia.smartfox.tools.util.SFSObjectUtil.safePutInt;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
 
 /**
- * Copyright (c) 2012 i-Free. All Rights Reserved.
- *
  * @author Ilya Sadykov
  *         Date: 20.10.12
  *         Time: 3:59

@@ -6,8 +6,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Copyright (c) 2012 i-Free. All Rights Reserved.
- *
  * @author Ilya Sadykov
  *         Date: 19.10.12
  *         Time: 14:28
