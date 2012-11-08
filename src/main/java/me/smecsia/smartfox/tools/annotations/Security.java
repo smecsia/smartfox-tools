@@ -1,6 +1,6 @@
 package me.smecsia.smartfox.tools.annotations;
 
-import me.smecsia.smartfox.tools.service.AuthService;
+import me.smecsia.smartfox.tools.service.BasicAuthService;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -26,6 +26,6 @@ public @interface Security {
      * Defines the custom authentication service
      * @return
      */
-    public Class<? extends AuthService> authService() default AuthService.class;
+    public Class<? extends BasicAuthService> authService() default BasicAuthService.class;
 
 }

@@ -8,7 +8,7 @@ import com.smartfoxserver.v2.extensions.BaseServerEventHandler;
 import com.smartfoxserver.v2.extensions.SFSExtension;
 import me.smecsia.smartfox.tools.common.BasicHandler;
 import me.smecsia.smartfox.tools.error.UnauthorizedException;
-import me.smecsia.smartfox.tools.service.AuthService;
+import me.smecsia.smartfox.tools.service.BasicAuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +34,7 @@ public abstract class AbstractServerEventHandler extends BaseServerEventHandler 
     @Override
     public final void handleServerEvent(ISFSEvent isfsEvent) throws SFSException {
         try {
-            AuthService.checkAuthIfRequired(this, (User) isfsEvent.getParameter(SFSEventParam.USER));
+            BasicAuthService.checkAuthIfRequired(this, (User) isfsEvent.getParameter(SFSEventParam.USER));
             doHandle(isfsEvent);
         } catch (UnauthorizedException ua) {
             logger.error("User unauthorized: " + ua.getMessage());

@@ -8,7 +8,6 @@ You can easily serialize and deserialize your objects from/to ISFSObject:
 
 ```java
 class MyObject extends AbstractTransportObject {
-    @SFSSerialize
     private Integer field;
     public Integer getField(){
         return field;

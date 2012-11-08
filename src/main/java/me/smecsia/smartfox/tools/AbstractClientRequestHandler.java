@@ -6,7 +6,7 @@ import com.smartfoxserver.v2.extensions.BaseClientRequestHandler;
 import com.smartfoxserver.v2.extensions.SFSExtension;
 import me.smecsia.smartfox.tools.common.BasicHandler;
 import me.smecsia.smartfox.tools.error.UnauthorizedException;
-import me.smecsia.smartfox.tools.service.AuthService;
+import me.smecsia.smartfox.tools.service.BasicAuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public abstract class AbstractClientRequestHandler extends BaseClientRequestHand
     @Override
     public final void handleClientRequest(User user, ISFSObject isfsObject) {
         try {
-            AuthService.checkAuthIfRequired(this, user);
+            BasicAuthService.checkAuthIfRequired(this, user);
             doHandle(user, isfsObject);
         } catch (UnauthorizedException ua) {
             logger.error("User unauthorized: " + ua.getMessage());
