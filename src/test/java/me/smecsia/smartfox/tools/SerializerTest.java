@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import static junit.framework.Assert.*;
+import static junit.framework.Assert.assertEquals;
 import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy.ALL_FIELDS;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.safePutInt;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
@@ -36,6 +37,7 @@ public class SerializerTest {
         entityObj.putSFSObject("subEntity", subEntityObj);
         entityObj.putUtfString("notDeserializable", "value1");
         entityObj.putUtfString("notSerializable", "value2");
+        entityObj.putUtfString("enumField", "white");
 
         ISFSArray subArray = new SFSArray();
         SFSObject subObj1 = new SFSObject();
@@ -49,7 +51,7 @@ public class SerializerTest {
         entityObj.putSFSArray("subEntities", subArray);
 
         Entity entity = serializerService.deserialize(Entity.class, entityObj);
-
+        assertEquals(Entity.Color.white, entity.getEnumField());
         assertEquals(entityObj.getInt("intField"), entity.getIntField());
         assertEquals(entityObj.getUtfString("notSerializable"), entity.getNotSerializable());
         assertNull(entity.getNotDeserializable());
@@ -114,10 +116,12 @@ public class SerializerTest {
         entity.setSubEntities(Arrays.asList(new SubEntity(100L), new SubEntity(100L)));
         entity.setNotDeserializable("value1");
         entity.setNotSerializable("value2");
+        entity.setEnumField(Entity.Color.black);
 
         ISFSObject sObj = serializerService.serialize(entity);
 
         assertEquals(entity.getIntField(), sObj.getInt("intField"));
+        assertEquals(entity.getEnumField().name(), sObj.getUtfString("enumField"));
         assertEquals(entity.getNotDeserializable(), sObj.getUtfString("notDeserializable"));
         assertNull(sObj.getUtfString("notSerializable"));
         assertEquals(entity.getStringField(), sObj.getUtfString("stringField"));
@@ -165,6 +169,8 @@ public class SerializerTest {
 
     @SFSSerializeStrategy(type = ALL_FIELDS)
     public static class Entity extends AbstractTransportObject {
+        public static enum Color {white, black}
+
         private Integer intField;
         private String stringField;
         private SubEntity subEntity;
@@ -174,6 +180,7 @@ public class SerializerTest {
         @SFSSerialize(serialize = false)
         private String notSerializable;
         private List<? extends TransportObject> wildcardList;
+        private Color enumField;
 
         @SFSCustomListItemDeserializer(listName = "wildcardList")
         public TransportObject deserializeWildcardItem(ISFSObject object) {
@@ -245,6 +252,14 @@ public class SerializerTest {
 
         public void setWildcardList(List<? extends TransportObject> wildcardList) {
             this.wildcardList = wildcardList;
+        }
+
+        public Color getEnumField() {
+            return enumField;
+        }
+
+        public void setEnumField(Color enumField) {
+            this.enumField = enumField;
         }
     }
 }

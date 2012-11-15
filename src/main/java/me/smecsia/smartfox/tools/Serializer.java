@@ -8,6 +8,7 @@ import me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy;
 import me.smecsia.smartfox.tools.common.BasicService;
 import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.error.MetadataException;
+import me.smecsia.smartfox.tools.util.EnumUtil;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
@@ -33,7 +34,7 @@ import static me.smecsia.smartfox.tools.util.TypesUtil.*;
 public class Serializer extends BasicService {
 
     private enum FieldType {
-        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, ENTITY, ENTITY_ARRAY, UNKNOWN
+        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, UNKNOWN
     }
 
     private static final Map<Class<? extends TransportObject>, Metadata> metaCache =
@@ -183,6 +184,9 @@ public class Serializer extends BasicService {
                     meta.fieldType = FieldType.BOOL;
                 } else if (isInt(field.getType())) {
                     meta.fieldType = FieldType.INT;
+                } else if (Enum.class.isAssignableFrom(field.getType())) {
+                    meta.fieldType = FieldType.ENUM;
+                    meta.genericType = field.getType();
                 } else if (Collection.class.isAssignableFrom(field.getType())) {
                     Type[] typeArgs = getFieldTypeArguments(field);
                     if (typeArgs.length == 1) {
@@ -282,6 +286,9 @@ public class Serializer extends BasicService {
                         case STRING:
                             safePutString(result, fieldName, (String) value);
                             break;
+                        case ENUM:
+                            safePutString(result, fieldName, ((Enum) value).name());
+                            break;
                         case ENTITY:
                             safePutSFSObject(result, fieldName, serialize((TransportObject) value));
                             break;
@@ -348,6 +355,9 @@ public class Serializer extends BasicService {
                             break;
                         case STRING:
                             value = object.getUtfString(fieldName);
+                            break;
+                        case ENUM:
+                            value = EnumUtil.fromString((Class<Enum>) fieldMeta.genericType, object.getUtfString(fieldName));
                             break;
                         case ENTITY:
                             value = deserialize((Class<T>) fieldMeta.type, object.getSFSObject(fieldName));
