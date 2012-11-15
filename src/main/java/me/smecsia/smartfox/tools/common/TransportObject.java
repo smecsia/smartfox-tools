@@ -11,4 +11,6 @@ import com.smartfoxserver.v2.entities.data.ISFSObject;
 public interface TransportObject {
     public ISFSObject toSFSObject();
     public void updateFromSFSObject(ISFSObject obj);
+
+    String toJson();
 }

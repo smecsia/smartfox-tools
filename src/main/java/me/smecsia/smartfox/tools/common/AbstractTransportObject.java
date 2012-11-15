@@ -1,7 +1,8 @@
 package me.smecsia.smartfox.tools.common;
 
 import com.smartfoxserver.v2.entities.data.ISFSObject;
-import me.smecsia.smartfox.tools.util.SFSObjectUtil;
+
+import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
 
 /**
  *
@@ -13,11 +14,16 @@ public abstract class AbstractTransportObject implements TransportObject {
 
     @Override
     public ISFSObject toSFSObject() {
-        return SFSObjectUtil.serialize(this);
+        return serialize(this);
     }
 
     @Override
     public void updateFromSFSObject(ISFSObject obj) {
-        SFSObjectUtil.deserialize(this, obj);
+        deserialize(this, obj);
+    }
+
+    @Override
+    public String toJson() {
+        return sfsToJson(toSFSObject());
     }
 }
