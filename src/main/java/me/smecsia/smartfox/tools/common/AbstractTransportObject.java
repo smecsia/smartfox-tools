@@ -24,6 +24,6 @@ public abstract class AbstractTransportObject implements TransportObject {
 
     @Override
     public String toJson() {
-        return sfsToJson(toSFSObject());
+        return toSFSObject().toJson();
     }
 }
