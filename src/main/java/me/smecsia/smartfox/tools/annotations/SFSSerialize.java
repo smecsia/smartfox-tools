@@ -16,6 +16,8 @@ public @interface SFSSerialize {
 
     public boolean deserialize() default true;
 
+    public String name() default "";
+
     public String[] options() default {};
 
     public static final class DEFAULT {
@@ -29,6 +31,11 @@ public @interface SFSSerialize {
                 @Override
                 public boolean deserialize() {
                     return true;
+                }
+
+                @Override
+                public String name() {
+                    return "";
                 }
 
                 @Override

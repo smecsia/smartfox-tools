@@ -22,6 +22,7 @@ import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
  *         Time: 3:59
  */
 public class SFSSerializerTest {
+
     @Test
     public void testDeserialize() {
         SFSSerializer sfsSerializer = new SFSSerializer();
@@ -34,6 +35,7 @@ public class SFSSerializerTest {
         entityObj.putUtfString("notDeserializable", "value1");
         entityObj.putUtfString("notSerializable", "value2");
         entityObj.putUtfString("enumField", "white");
+        entityObj.putUtfString("changedName", "changedValue");
 
         ISFSArray subArray = new SFSArray();
         SFSObject subObj1 = new SFSObject();
@@ -50,6 +52,7 @@ public class SFSSerializerTest {
         assertEquals(Entity.Color.white, entity.getEnumField());
         assertEquals(entityObj.getInt("intField"), entity.getIntField());
         assertEquals(entityObj.getUtfString("notSerializable"), entity.getNotSerializable());
+        assertEquals(entityObj.getUtfString("changedName"), entity.getNameToBeChanged());
         assertNull(entity.getNotDeserializable());
         assertEquals(subEntityObj.getLong("longField"), entity.getSubEntity().getLongField());
 
@@ -136,6 +139,7 @@ public class SFSSerializerTest {
 
         assertEquals(entity.getIntField(), sObj.getInt("intField"));
         assertEquals(entity.getEnumField().name(), sObj.getUtfString("enumField"));
+        assertEquals(entity.getNameToBeChanged(), sObj.getUtfString("changedName"));
         assertEquals(entity.getNotDeserializable(), sObj.getUtfString("notDeserializable"));
         assertNull(sObj.getUtfString("notSerializable"));
         assertNull(sObj.getUtfString("ignoredField"));
@@ -198,6 +202,8 @@ public class SFSSerializerTest {
         private Boolean preProcessed = false;
         @SFSSerializeIgnore
         private String ignoredField = "ignoredValue";
+        @SFSSerialize(name = "changedName")
+        private String nameToBeChanged = "value";
 
         @SFSCustomListItemDeserializer(listName = "wildcardList")
         public TransportObject deserializeWildcardItem(ISFSObject object) {
@@ -293,6 +299,14 @@ public class SFSSerializerTest {
 
         public void setIgnoredField(String ignoredField) {
             this.ignoredField = ignoredField;
+        }
+
+        public String getNameToBeChanged() {
+            return nameToBeChanged;
+        }
+
+        public void setNameToBeChanged(String nameToBeChanged) {
+            this.nameToBeChanged = nameToBeChanged;
         }
     }
 }

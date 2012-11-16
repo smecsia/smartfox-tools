@@ -17,10 +17,10 @@ import static me.smecsia.smartfox.tools.util.ClassUtil.*;
 import static me.smecsia.smartfox.tools.util.ExceptionUtil.formatStackTrace;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
 import static me.smecsia.smartfox.tools.util.TypesUtil.*;
+import static org.apache.commons.lang.StringUtils.isEmpty;
 
 
 /**
- *
  * @author Ilya Sadykov
  *         Date: 19.10.12
  *         Time: 3:32
@@ -175,7 +175,7 @@ public class SFSSerializer extends BasicService {
             if (sfsSerializeStrategy != null) {
                 this.serializeStrategy = sfsSerializeStrategy.type();
             } else {
-                this.serializeStrategy = Strategy.ALL_FIELDS;
+                this.serializeStrategy = Strategy.DEFAULT;
             }
 
             for (Field field : fields) {
@@ -187,10 +187,13 @@ public class SFSSerializer extends BasicService {
                 }
 
                 // building metadata
-                FieldMeta meta = new FieldMeta(field.getName());
+                final SFSSerialize config = (annotation != null) ? annotation : SFSSerialize.DEFAULT.get();
+
+                FieldMeta meta = new FieldMeta((!isEmpty(config.name())) ? config.name() : field.getName());
                 meta.getter = findGetter(field);
                 meta.setter = findSetter(field);
-                meta.config = (annotation != null) ? annotation : SFSSerialize.DEFAULT.get();
+                meta.config = config;
+
                 meta.customDeserializer = findCustomDeserializer(methods, field);
                 meta.customSerializer = findCustomSerializer(methods, field);
                 meta.type = field.getType();
@@ -234,8 +237,8 @@ public class SFSSerializer extends BasicService {
                     meta.fieldType = FieldType.UNKNOWN;
                 }
                 if (meta.fieldType != FieldType.UNKNOWN) {
-                    entityFields.put(field.getName(), meta);
-                    fieldsOptions.put(field.getName(), meta.config.options());
+                    entityFields.put(meta.name, meta);
+                    fieldsOptions.put(meta.name, meta.config.options());
                 }
             }
         }
@@ -451,5 +454,4 @@ public class SFSSerializer extends BasicService {
         }
         return null;
     }
-
 }
