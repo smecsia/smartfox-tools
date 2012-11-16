@@ -7,6 +7,9 @@ import me.smecsia.smartfox.tools.annotations.SFSSerialize;
 import me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy;
 import me.smecsia.smartfox.tools.common.AbstractTransportObject;
 import me.smecsia.smartfox.tools.common.TransportObject;
+import me.smecsia.smartfox.tools.serialize.SFSSerializePostProcessor;
+import me.smecsia.smartfox.tools.serialize.SFSSerializePreProcessor;
+import me.smecsia.smartfox.tools.serialize.SFSSerializer;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -15,7 +18,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import static junit.framework.Assert.*;
-import static junit.framework.Assert.assertEquals;
 import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy.ALL_FIELDS;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.safePutInt;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
@@ -28,7 +30,7 @@ import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
 public class SerializerTest {
     @Test
     public void testDeserialize() {
-        Serializer serializerService = new Serializer();
+        SFSSerializer sfsSerializer = new SFSSerializer();
 
         ISFSObject subEntityObj = new SFSObject();
         subEntityObj.putLong("longField", 20L);
@@ -47,10 +49,10 @@ public class SerializerTest {
         subArray.addSFSObject(subObj1);
         subArray.addSFSObject(subObj2);
 
-
         entityObj.putSFSArray("subEntities", subArray);
 
-        Entity entity = serializerService.deserialize(Entity.class, entityObj);
+        Entity entity = sfsSerializer.deserialize(Entity.class, entityObj);
+
         assertEquals(Entity.Color.white, entity.getEnumField());
         assertEquals(entityObj.getInt("intField"), entity.getIntField());
         assertEquals(entityObj.getUtfString("notSerializable"), entity.getNotSerializable());
@@ -66,7 +68,7 @@ public class SerializerTest {
 
     @Test
     public void testSerializeCustom() {
-        Serializer serializerService = new Serializer();
+        SFSSerializer sfsSerializer = new SFSSerializer();
         Entity entity = new Entity();
         List<Entity> list = new ArrayList<Entity>();
         Entity subEntity = new Entity();
@@ -74,16 +76,34 @@ public class SerializerTest {
         list.add(subEntity);
         entity.setWildcardList(list);
 
-        ISFSObject sObj = serializerService.serialize(entity);
+        sfsSerializer.registerPostProcessor(new SFSSerializePostProcessor() {
+            @Override
+            public <T extends TransportObject> void process(ISFSObject result, T sourceObject) {
+                if(sourceObject instanceof Entity)
+                    result.putBool("postProcessed", true);
+            }
+        });
+        sfsSerializer.registerPreProcessor(new SFSSerializePreProcessor() {
+            @Override
+            public <T extends TransportObject> void process(T sourceObject) {
+                if (sourceObject instanceof Entity)
+                    ((Entity) sourceObject).setPreProcessed(true);
+            }
+        });
+
+        ISFSObject sObj = sfsSerializer.serialize(entity);
 
         assertNotNull(sObj.getSFSArray("wildcardList"));
+        assertTrue(sObj.getBool("postProcessed"));
+        assertTrue(sObj.getBool("preProcessed"));
         Iterator<SFSDataWrapper> iterator = sObj.getSFSArray("wildcardList").iterator();
         assertEquals(20, ((SFSObject) iterator.next().getObject()).getInt("intField").intValue());
+
     }
 
     @Test
     public void testDeserializeCustom() {
-        Serializer serializerService = new Serializer();
+        SFSSerializer sfsSerializer = new SFSSerializer();
         ISFSObject entityObj = new SFSObject();
         entityObj.putInt("intField", 10);
         ISFSArray subArray = new SFSArray();
@@ -94,7 +114,7 @@ public class SerializerTest {
         entityObj.putSFSArray("wildcardList", subArray);
 
         Entity entity = new Entity();
-        serializerService.deserialize(entity, entityObj);
+        sfsSerializer.deserialize(entity, entityObj);
 
         assertNotNull("Wildcarded deserialized list must not be null!", entity.getWildcardList());
         assertFalse("Wildcarded deserialized list must not be empty!", entity.getWildcardList().isEmpty());
@@ -103,7 +123,7 @@ public class SerializerTest {
 
     @Test
     public void testSerialize() {
-        Serializer serializerService = new Serializer();
+        SFSSerializer sfsSerializer = new SFSSerializer();
 
         SubEntity subEntity = new SubEntity();
         subEntity.setLongField(10L);
@@ -118,7 +138,7 @@ public class SerializerTest {
         entity.setNotSerializable("value2");
         entity.setEnumField(Entity.Color.black);
 
-        ISFSObject sObj = serializerService.serialize(entity);
+        ISFSObject sObj = sfsSerializer.serialize(entity);
 
         assertEquals(entity.getIntField(), sObj.getInt("intField"));
         assertEquals(entity.getEnumField().name(), sObj.getUtfString("enumField"));
@@ -164,7 +184,6 @@ public class SerializerTest {
         public void setLongField(Long longField) {
             this.longField = longField;
         }
-
     }
 
     @SFSSerializeStrategy(type = ALL_FIELDS)
@@ -181,6 +200,7 @@ public class SerializerTest {
         private String notSerializable;
         private List<? extends TransportObject> wildcardList;
         private Color enumField;
+        private Boolean preProcessed = false;
 
         @SFSCustomListItemDeserializer(listName = "wildcardList")
         public TransportObject deserializeWildcardItem(ISFSObject object) {
@@ -260,6 +280,14 @@ public class SerializerTest {
 
         public void setEnumField(Color enumField) {
             this.enumField = enumField;
+        }
+
+        public Boolean getPreProcessed() {
+            return preProcessed;
+        }
+
+        public void setPreProcessed(Boolean preProcessed) {
+            this.preProcessed = preProcessed;
         }
     }
 }

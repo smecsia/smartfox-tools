@@ -3,6 +3,8 @@ package me.smecsia.smartfox.tools.annotations;
 import java.lang.annotation.*;
 
 /**
+ * Copyright (c) 2012 i-Free. All Rights Reserved.
+ *
  * @author Ilya Sadykov
  *         Date: 19.10.12
  *         Time: 14:28
@@ -13,6 +15,8 @@ public @interface SFSSerialize {
     public boolean serialize() default true;
 
     public boolean deserialize() default true;
+
+    public String[] options() default {};
 
     public static final class DEFAULT {
         public static SFSSerialize get() {
@@ -25,6 +29,11 @@ public @interface SFSSerialize {
                 @Override
                 public boolean deserialize() {
                     return true;
+                }
+
+                @Override
+                public String[] options() {
+                    return new String[0];
                 }
 
                 @Override

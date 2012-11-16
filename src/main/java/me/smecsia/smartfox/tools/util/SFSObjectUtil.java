@@ -2,7 +2,7 @@ package me.smecsia.smartfox.tools.util;
 
 import com.smartfoxserver.v2.entities.data.ISFSArray;
 import com.smartfoxserver.v2.entities.data.ISFSObject;
-import me.smecsia.smartfox.tools.Serializer;
+import me.smecsia.smartfox.tools.serialize.SFSSerializer;
 import me.smecsia.smartfox.tools.common.TransportObject;
 
 import static org.apache.commons.lang.StringUtils.isEmpty;
@@ -15,7 +15,7 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  */
 public class SFSObjectUtil {
 
-    private static final Serializer serializer = new Serializer();
+    private static final SFSSerializer SFS_SERIALIZER = new SFSSerializer();
 
     public static ISFSObject safePutFloat(ISFSObject obj, String key, Float value) {
         if (value != null && obj != null && !isEmpty(key)) {
@@ -88,14 +88,14 @@ public class SFSObjectUtil {
     }
 
     public static <T extends TransportObject> TransportObject deserialize(T instance, ISFSObject sfsObj) {
-        return serializer.deserialize(instance, sfsObj);
+        return SFS_SERIALIZER.deserialize(instance, sfsObj);
     }
 
     public static <T extends TransportObject> TransportObject deserialize(Class<T> clazz, ISFSObject sfsObj) {
-        return serializer.deserialize(clazz, sfsObj);
+        return SFS_SERIALIZER.deserialize(clazz, sfsObj);
     }
 
     public static ISFSObject serialize(TransportObject transportObject) {
-        return serializer.serialize(transportObject);
+        return SFS_SERIALIZER.serialize(transportObject);
     }
 }

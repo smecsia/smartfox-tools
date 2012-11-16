@@ -6,6 +6,8 @@ import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,5 +88,20 @@ public class ClassUtil {
             clazz = clazz.getSuperclass();
         }
         return methods;
+    }
+
+    /**
+     * Returns the generic arguments from the field
+     *
+     * @param field - field to be reflect
+     * @return Type arguments array
+     */
+    public static Type[] getFieldTypeArguments(Field field) {
+        Type genericFieldType = field.getGenericType();
+        if (genericFieldType instanceof ParameterizedType) {
+            ParameterizedType aType = (ParameterizedType) genericFieldType;
+            return aType.getActualTypeArguments();
+        }
+        return new Type[]{};
     }
 }
