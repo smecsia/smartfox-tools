@@ -1,10 +1,7 @@
 package me.smecsia.smartfox.tools.serialize;
 
 import com.smartfoxserver.v2.entities.data.*;
-import me.smecsia.smartfox.tools.annotations.SFSCustomListItemDeserializer;
-import me.smecsia.smartfox.tools.annotations.SFSCustomListItemSerializer;
-import me.smecsia.smartfox.tools.annotations.SFSSerialize;
-import me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy;
+import me.smecsia.smartfox.tools.annotations.*;
 import me.smecsia.smartfox.tools.common.BasicService;
 import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.error.MetadataException;
@@ -184,7 +181,8 @@ public class SFSSerializer extends BasicService {
             for (Field field : fields) {
                 // skip fields that are not mapped as serializable
                 SFSSerialize annotation = field.getAnnotation(SFSSerialize.class);
-                if (annotation == null && this.serializeStrategy.equals(Strategy.ANNOTATED_FIELDS)) {
+                if ((annotation == null && this.serializeStrategy.equals(Strategy.ANNOTATED_FIELDS)) ||
+                        field.getAnnotation(SFSSerializeIgnore.class) != null) {
                     continue;
                 }
 
