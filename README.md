@@ -4,8 +4,8 @@ This is a small library helping you to implement your own extension for SmartFox
 
 ## Release notes
 
-0.3 - SFSSerializer now supports custom serialize post/pre processors & custom field serializer/deserializer.
-0.2 - SFSSerializer support for enums / list of enums.
+0.6 - SFSSerializer now supports custom serialize post/pre processors & custom field serializer/deserializer.
+0.3 - SFSSerializer support for enums / list of enums.
 
 ## What it gives
 
@@ -66,7 +66,7 @@ to see how to do it. Or you can start with [this example](https://github.com/sme
         <dependency>
             <groupId>me.smecsia.smartfox</groupId>
             <artifactId>smartfox-tools</artifactId>
-            <version>0.3</version>
+            <version>0.6</version>
         </dependency>
     </dependencies>
     <!-- ... -->
