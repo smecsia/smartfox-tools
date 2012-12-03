@@ -12,17 +12,14 @@ import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
  */
 public abstract class AbstractTransportObject implements TransportObject {
 
-    @Override
     public ISFSObject toSFSObject() {
         return serialize(this);
     }
 
-    @Override
     public void updateFromSFSObject(ISFSObject obj) {
         deserialize(this, obj);
     }
 
-    @Override
     public String toJson() {
         return toSFSObject().toJson();
     }
