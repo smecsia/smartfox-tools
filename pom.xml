@@ -24,7 +24,7 @@
 
     <scm>
         <connection>scm:git:https://github.com/smecsia/smartfox-tools.git</connection>
-        <developerConnection>scm:git:ttps://github.com/smecsia/smartfox-tools.git</developerConnection>
+        <developerConnection>scm:git:https://github.com/smecsia/smartfox-tools.git</developerConnection>
         <url>scm:git:https://github.com/smecsia/smartfox-tools.git</url>
         <tag>HEAD</tag>
     </scm>
