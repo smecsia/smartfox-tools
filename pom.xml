@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <artifactId>smartfox-tools</artifactId>
     <groupId>me.smecsia.smartfox</groupId>
-    <version>2.3.0-SNAPSHOT</version>
+    <version>0.1-SNAPSHOT</version>
     <modelVersion>4.0.0</modelVersion>
     <packaging>jar</packaging>
     <properties>
@@ -21,6 +21,13 @@
             <url>http://maven.smecsia.me/</url>
         </repository>
     </repositories>
+
+    <scm>
+        <connection>scm:git:https://github.com/smecsia/smartfox-tools.git</connection>
+        <developerConnection>scm:git:ttps://github.com/smecsia/smartfox-tools.git</developerConnection>
+        <url>scm:git:https://github.com/smecsia/smartfox-tools.git</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <dependencies>
         <dependency>
@@ -58,6 +65,18 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.3.1</version>
+                <configuration>
+                    <tagNameFormat>smartfox-tools-@{project.version}</tagNameFormat>
+                    <branchName>smartfox-tools-${project.version}-hotfix</branchName>
+                    <preparationGoals>clean install</preparationGoals>
+                    <goals>package</goals>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
