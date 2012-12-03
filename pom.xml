@@ -72,7 +72,7 @@
                 <configuration>
                     <tagNameFormat>smartfox-tools-@{project.version}</tagNameFormat>
                     <branchName>smartfox-tools-${project.version}-hotfix</branchName>
-                    <preparationGoals>clean install</preparationGoals>
+                    <preparationGoals>clean install -DcreateChecksum=true</preparationGoals>
                     <goals>package</goals>
                     <autoVersionSubmodules>true</autoVersionSubmodules>
                 </configuration>
