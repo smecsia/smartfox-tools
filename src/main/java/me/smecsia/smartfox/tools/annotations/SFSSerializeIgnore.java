@@ -12,7 +12,8 @@ import java.lang.annotation.Target;
  *         Date: 19.10.12
  *         Time: 14:28
  */
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface SFSSerializeIgnore {
+    String[] fields() default {};
 }

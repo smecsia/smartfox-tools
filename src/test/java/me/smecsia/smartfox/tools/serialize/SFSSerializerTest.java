@@ -4,24 +4,23 @@ import com.smartfoxserver.v2.entities.data.*;
 import me.smecsia.smartfox.tools.annotations.*;
 import me.smecsia.smartfox.tools.common.AbstractTransportObject;
 import me.smecsia.smartfox.tools.common.TransportObject;
+import me.smecsia.smartfox.tools.util.SFSObjectUtil;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
 import static junit.framework.Assert.*;
-import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy.ALL_FIELDS;
-import static me.smecsia.smartfox.tools.util.SFSObjectUtil.safePutInt;
-import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
 
 /**
  * @author Ilya Sadykov
- *         Date: 20.10.12
- *         Time: 3:59
+ *         Date: 19.10.12
+ *         Time: 13:49
  */
 public class SFSSerializerTest {
+
 
     @Test
     public void testDeserialize() {
@@ -36,6 +35,11 @@ public class SFSSerializerTest {
         entityObj.putUtfString("notSerializable", "value2");
         entityObj.putUtfString("enumField", "white");
         entityObj.putUtfString("changedName", "changedValue");
+        entityObj.putUtfString("fieldWithoutGetter", "value");
+        entityObj.putInt("fieldCustomSerializable", 10);
+        entityObj.putUtfString("totallyIgnoredField", "value");
+
+        entityObj.putUtfStringArray("colors", Arrays.asList("black", "black", "white"));
 
         ISFSArray subArray = new SFSArray();
         SFSObject subObj1 = new SFSObject();
@@ -50,10 +54,14 @@ public class SFSSerializerTest {
         Entity entity = sfsSerializer.deserialize(Entity.class, entityObj);
 
         assertEquals(Entity.Color.white, entity.getEnumField());
+        assertEquals(Entity.Color.white, entity.getColors().get(2));
         assertEquals(entityObj.getInt("intField"), entity.getIntField());
+        assertEquals((Long) 10L, entity.fieldCustomSerializable);
+        assertEquals(entityObj.getUtfString("fieldWithoutGetter"), entity.fieldWithoutGetter);
         assertEquals(entityObj.getUtfString("notSerializable"), entity.getNotSerializable());
         assertEquals(entityObj.getUtfString("changedName"), entity.getNameToBeChanged());
         assertNull(entity.getNotDeserializable());
+        assertNull(entity.totallyIgnoredField);
         assertEquals(subEntityObj.getLong("longField"), entity.getSubEntity().getLongField());
 
         assertNotNull(entity.getSubEntities());
@@ -67,11 +75,12 @@ public class SFSSerializerTest {
     public void testSerializeCustom() {
         SFSSerializer sfsSerializer = new SFSSerializer();
         Entity entity = new Entity();
-        List<Entity> list = new ArrayList<Entity>();
         Entity subEntity = new Entity();
+        Entity subEntityCustom = new Entity();
         subEntity.setIntField(10);
-        list.add(subEntity);
-        entity.setWildcardList(list);
+        subEntityCustom.setIntField(99);
+        entity.setWildcardList(Arrays.asList(subEntity));
+        entity.setWildcardedListCustom(Arrays.asList(subEntityCustom));
 
         sfsSerializer.registerPostProcessor(new SFSSerializePostProcessor() {
             @Override
@@ -83,7 +92,7 @@ public class SFSSerializerTest {
         sfsSerializer.registerPreProcessor(new SFSSerializePreProcessor() {
             @Override
             public <T extends TransportObject> void process(T sourceObject) {
-                if(sourceObject instanceof Entity)
+                if (sourceObject instanceof Entity)
                     ((Entity) sourceObject).setPreProcessed(true);
             }
         });
@@ -94,8 +103,10 @@ public class SFSSerializerTest {
         assertTrue(sObj.getBool("postProcessed"));
         assertTrue(sObj.getBool("preProcessed"));
         Iterator<SFSDataWrapper> iterator = sObj.getSFSArray("wildcardList").iterator();
-        assertEquals(20, ((SFSObject) iterator.next().getObject()).getInt("intField").intValue());
+        assertEquals(subEntity.getIntField() * 2, ((SFSObject) iterator.next().getObject()).getInt("intField").intValue());
 
+        Iterator<SFSDataWrapper> customIterator = sObj.getSFSArray("wildcardedListCustom").iterator();
+        assertEquals(subEntityCustom.getIntField(), ((SFSObject) customIterator.next().getObject()).getInt("intField"));
     }
 
     @Test
@@ -104,11 +115,16 @@ public class SFSSerializerTest {
         ISFSObject entityObj = new SFSObject();
         entityObj.putInt("intField", 10);
         ISFSArray subArray = new SFSArray();
+        ISFSArray subCustomArray = new SFSArray();
         SFSObject subObj1 = new SFSObject();
+        SFSObject subCustomObj = new SFSObject();
         subObj1.putLong("longField", 30L);
+        subCustomObj.putLong("longField", 99L);
         subArray.addSFSObject(subObj1);
+        subCustomArray.addSFSObject(subCustomObj);
 
         entityObj.putSFSArray("wildcardList", subArray);
+        entityObj.putSFSArray("wildcardedListCustom", subCustomArray);
 
         Entity entity = new Entity();
         sfsSerializer.deserialize(entity, entityObj);
@@ -116,6 +132,7 @@ public class SFSSerializerTest {
         assertNotNull("Wildcarded deserialized list must not be null!", entity.getWildcardList());
         assertFalse("Wildcarded deserialized list must not be empty!", entity.getWildcardList().isEmpty());
         assertEquals(30L, ((SubEntity) entity.getWildcardList().get(0)).getLongField().longValue());
+        assertEquals(99L, ((SubEntity) entity.getWildcardedListCustom().get(0)).getLongField().longValue());
     }
 
     @Test
@@ -132,15 +149,24 @@ public class SFSSerializerTest {
         entity.setSubEntity(subEntity);
         entity.setSubEntities(Arrays.asList(new SubEntity(100L), new SubEntity(100L)));
         entity.setNotDeserializable("value1");
+        entity.fieldWithoutGetter = "value";
         entity.setNotSerializable("value2");
         entity.setEnumField(Entity.Color.black);
+        entity.setColors(Arrays.asList(Entity.Color.black, Entity.Color.white));
+        entity.fieldCustomSerializable = 20L;
+        entity.totallyIgnoredField = "value";
 
         ISFSObject sObj = sfsSerializer.serialize(entity);
 
         assertEquals(entity.getIntField(), sObj.getInt("intField"));
+        assertEquals(entity.fieldWithoutGetter, sObj.getUtfString("fieldWithoutGetter"));
         assertEquals(entity.getEnumField().name(), sObj.getUtfString("enumField"));
         assertEquals(entity.getNameToBeChanged(), sObj.getUtfString("changedName"));
         assertEquals(entity.getNotDeserializable(), sObj.getUtfString("notDeserializable"));
+        assertEquals(20, sObj.getInt("fieldCustomSerializable").intValue());
+        Collection<String> colors = sObj.getUtfStringArray("colors");
+        assertTrue(colors.contains(entity.getColors().get(1).name()));
+        assertNull(sObj.getUtfString("totallyIgnoredField"));
         assertNull(sObj.getUtfString("notSerializable"));
         assertNull(sObj.getUtfString("ignoredField"));
         assertEquals(entity.getStringField(), sObj.getUtfString("stringField"));
@@ -185,7 +211,8 @@ public class SFSSerializerTest {
         }
     }
 
-    @SFSSerializeStrategy(type = ALL_FIELDS)
+    @SFSSerializeStrategy(type = SFSSerializeStrategy.Strategy.ALL_FIELDS)
+    @SFSSerializeIgnore(fields = {"totallyIgnoredField"})
     public static class Entity extends AbstractTransportObject {
         public static enum Color {white, black}
 
@@ -198,12 +225,33 @@ public class SFSSerializerTest {
         @SFSSerialize(serialize = false)
         private String notSerializable;
         private List<? extends TransportObject> wildcardList;
+        private List<? extends TransportObject> wildcardedListCustom;
         private Color enumField;
         private Boolean preProcessed = false;
         @SFSSerializeIgnore
         private String ignoredField = "ignoredValue";
         @SFSSerialize(name = "changedName")
         private String nameToBeChanged = "value";
+        @SFSSerialize
+        private List<Color> colors;
+        private String fieldWithoutGetter;
+        private Long fieldCustomSerializable;
+        private String totallyIgnoredField = null;
+
+        @SFSCustomListItemInitializer(listName = "wildcardedListCustom")
+        public TransportObject initializeWildCardedListItem(ISFSObject object) {
+            return new SubEntity();
+        }
+
+        @SFSCustomFieldDeserializer(fieldName = "fieldCustomSerializable")
+        public Long customDeserializeCustomField(SFSDataWrapper wrapper) {
+            return Long.valueOf((Integer) wrapper.getObject());
+        }
+
+        @SFSCustomFieldSerializer(fieldName = "fieldCustomSerializable")
+        public SFSDataWrapper customSerializeCustomField(Long value) {
+            return new SFSDataWrapper(SFSDataType.INT, value.intValue());
+        }
 
         @SFSCustomListItemDeserializer(listName = "wildcardList")
         public TransportObject deserializeWildcardItem(ISFSObject object) {
@@ -214,9 +262,9 @@ public class SFSSerializerTest {
 
         @SFSCustomListItemSerializer(listName = "wildcardList")
         public ISFSObject serializeWildcardItem(TransportObject object) {
-            ISFSObject res = serialize(object);
+            ISFSObject res = SFSObjectUtil.serialize(object);
             if (object instanceof Entity) {
-                safePutInt(res, "intField", ((Entity) object).getIntField() * 2);
+                SFSObjectUtil.safePutInt(res, "intField", ((Entity) object).getIntField() * 2);
             }
             return res;
         }
@@ -307,6 +355,22 @@ public class SFSSerializerTest {
 
         public void setNameToBeChanged(String nameToBeChanged) {
             this.nameToBeChanged = nameToBeChanged;
+        }
+
+        public List<Color> getColors() {
+            return colors;
+        }
+
+        public void setColors(List<Color> colors) {
+            this.colors = colors;
+        }
+
+        public List<? extends TransportObject> getWildcardedListCustom() {
+            return wildcardedListCustom;
+        }
+
+        public void setWildcardedListCustom(List<? extends TransportObject> wildcardedListCustom) {
+            this.wildcardedListCustom = wildcardedListCustom;
         }
     }
 }

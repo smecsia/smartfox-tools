@@ -4,10 +4,7 @@ import org.apache.commons.lang.ArrayUtils;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +15,7 @@ import java.util.List;
  * Time: 15:55
  */
 public class ClassUtil {
+
 
     /**
      * Recursive method used to find all classes in a given directory and subdirs.
@@ -44,6 +42,7 @@ public class ClassUtil {
         return classes;
     }
 
+
     /**
      * Searches for a certain annotation in the class hierarchy
      *
@@ -60,7 +59,6 @@ public class ClassUtil {
         }
         return result;
     }
-
 
     /**
      * Searches for all fields within class hierarchy
@@ -103,5 +101,55 @@ public class ClassUtil {
             return aType.getActualTypeArguments();
         }
         return new Type[]{};
+    }
+
+
+    /**
+     * Invokes any object method (even if it's private)
+     *
+     * @param instance
+     * @param method
+     * @param arguments
+     * @param <T>
+     */
+    public static <T> Object invokeAnyMethod(T instance, String method, Class<?>[] argTypes, Object... arguments) throws
+            NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        List<Class<?>> types = new ArrayList<Class<?>>();
+        if (argTypes == null) {
+            for (Object arg : arguments) {
+                types.add(arg.getClass());
+            }
+            argTypes = types.toArray(new Class<?>[types.size()]);
+        }
+        Method m = instance.getClass().getDeclaredMethod(method, argTypes);
+        m.setAccessible(true);
+        return m.invoke(instance, arguments);
+    }
+
+    /**
+     * Set private field
+     *
+     * @param instance
+     * @param name
+     * @param <T>
+     */
+    public static <T> void setPrivateField(T instance, String name, Object value) throws NoSuchFieldException, IllegalAccessException {
+        Field field = (instance instanceof Class)
+                ? ((Class) instance).getDeclaredField(name)
+                : instance.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(instance, value);
+    }
+
+    /**
+     * Invokes any object method (even if it's private)
+     *
+     * @param instance
+     * @param method
+     * @param <T>
+     */
+    public static <T> Object invokeAnyMethod(T instance, String method, Object... args) throws InvocationTargetException,
+            NoSuchMethodException, IllegalAccessException {
+        return invokeAnyMethod(instance, method, null, args);
     }
 }

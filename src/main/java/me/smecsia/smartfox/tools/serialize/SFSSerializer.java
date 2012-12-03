@@ -6,29 +6,25 @@ import me.smecsia.smartfox.tools.common.BasicService;
 import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.error.MetadataException;
 import me.smecsia.smartfox.tools.util.EnumUtil;
+import me.smecsia.smartfox.tools.util.ExceptionUtil;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static me.smecsia.smartfox.tools.annotations.SFSSerializeStrategy.Strategy;
 import static me.smecsia.smartfox.tools.util.ClassUtil.*;
-import static me.smecsia.smartfox.tools.util.ExceptionUtil.formatStackTrace;
 import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
 import static me.smecsia.smartfox.tools.util.TypesUtil.*;
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
-
 /**
  * @author Ilya Sadykov
- *         Date: 19.10.12
- *         Time: 3:32
  */
 public class SFSSerializer extends BasicService {
 
     private enum FieldType {
-        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, UNKNOWN
+        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, UNKNOWN
     }
 
     private static final Map<Class<? extends TransportObject>, Metadata> metaCache =
@@ -44,8 +40,12 @@ public class SFSSerializer extends BasicService {
         public FieldType fieldType;
         public Class<?> type;
         public Class<?> genericType;
-        public Method customSerializer;
-        public Method customDeserializer;
+        public Method customFieldSerializer;
+        public Method customFieldDeserializer;
+        public Method customListItemSerializer;
+        public Method customListItemDeserializer;
+        public Method customListItemInitializer;
+        public Field field;
         public final String name;
         public SFSSerialize config;
 
@@ -100,7 +100,7 @@ public class SFSSerializer extends BasicService {
      */
     private class Metadata<T extends TransportObject> {
         private Class<T> entityClass;
-        private Strategy serializeStrategy;
+        private SFSSerializeStrategy.Strategy serializeStrategy;
         private Map<String, FieldMeta> entityFields = new HashMap<String, FieldMeta>();
         public Map<String, String[]> fieldsOptions = new HashMap<String, String[]>();
 
@@ -125,29 +125,48 @@ public class SFSSerializer extends BasicService {
             try {
                 return entityClass.getMethod("get" + WordUtils.capitalize(field.getName()));
             } catch (NoSuchMethodException ignored) {
-            }
-            return null;
-        }
-
-        private Method findCustomDeserializer(Method[] methods, Field field) {
-            for (Method m : methods) {
-                SFSCustomListItemDeserializer annotation = m.getAnnotation(SFSCustomListItemDeserializer.class);
-                if (annotation != null && annotation.listName().equals(field.getName())) {
-                    Type returnType = m.getReturnType();
-                    Type[] paramTypes = m.getParameterTypes();
-                    if (returnType.equals(TransportObject.class)
-                            && paramTypes.length == 1
-                            && paramTypes[0].equals(ISFSObject.class)) {
-                        return m;
+                if (Boolean.TYPE.equals(field.getType())) {
+                    try {
+                        return entityClass.getMethod("is" + WordUtils.capitalize(field.getName()));
+                    } catch (NoSuchMethodException ignoredBoolean) {
+                        //ignore
                     }
-                    throw new MetadataException("The annotated method '" + m.getName() + "' cannot be used for " +
-                            "custom deserealization! It must return TransportObject and receive ISFSObject!");
                 }
             }
             return null;
         }
 
-        private Method findCustomSerializer(Method[] methods, Field field) {
+        private Method findCustomListItemInitializer(Method[] methods, Field field) {
+            for (Method m : methods) {
+                SFSCustomListItemInitializer annotation = m.getAnnotation(SFSCustomListItemInitializer.class);
+                if (annotation != null && annotation.listName().equals(field.getName())) {
+                    return validateCustomListItemInitializerMethod(m);
+                }
+            }
+            return null;
+        }
+
+        private Method validateCustomListItemInitializerMethod(Method m) {
+            Type returnType = m.getReturnType();
+            Type[] paramTypes = m.getParameterTypes();
+            if (!(returnType.equals(TransportObject.class) && paramTypes.length == 1 && paramTypes[0].equals(ISFSObject.class))) {
+                throw new MetadataException("The annotated method '" + m.getName() + "' cannot be used for " +
+                        "custom list item deserialization! It must return TransportObject and receive ISFSObject!");
+            }
+            return m;
+        }
+
+        private Method findCustomListItemDeserializer(Method[] methods, Field field) {
+            for (Method m : methods) {
+                SFSCustomListItemDeserializer annotation = m.getAnnotation(SFSCustomListItemDeserializer.class);
+                if (annotation != null && annotation.listName().equals(field.getName())) {
+                    return validateCustomListItemInitializerMethod(m);
+                }
+            }
+            return null;
+        }
+
+        private Method findCustomListItemSerializer(Method[] methods, Field field) {
             for (Method m : methods) {
                 SFSCustomListItemSerializer annotation = m.getAnnotation(SFSCustomListItemSerializer.class);
                 if (annotation != null && annotation.listName().equals(field.getName())) {
@@ -159,12 +178,48 @@ public class SFSSerializer extends BasicService {
                         return m;
                     }
                     throw new MetadataException("The annotated method '" + m.getName() + "' cannot be used for " +
-                            "custom deserealization! It must return ISFSObject and receive TransportObject!");
+                            "custom list item serialization! It must return ISFSObject and receive TransportObject!");
                 }
             }
             return null;
         }
 
+        private Method findCustomFieldDeserializer(Method[] methods, Field field) {
+            for (Method m : methods) {
+                SFSCustomFieldDeserializer annotation = m.getAnnotation(SFSCustomFieldDeserializer.class);
+                if (annotation != null && annotation.fieldName().equals(field.getName())) {
+                    Type returnType = m.getReturnType();
+                    Type[] paramTypes = m.getParameterTypes();
+                    if (returnType.equals(field.getType())
+                            && paramTypes.length == 1
+                            && paramTypes[0].equals(SFSDataWrapper.class)) {
+                        return m;
+                    }
+                    throw new MetadataException("The annotated method '" + m.getName() + "' cannot be used for " +
+                            "custom field serialization! It must return " + field.getType() + " and receive " +
+                            "SFSDataWrapper!");
+                }
+            }
+            return null;
+        }
+
+        private Method findCustomFieldSerializer(Method[] methods, Field field) {
+            for (Method m : methods) {
+                SFSCustomFieldSerializer annotation = m.getAnnotation(SFSCustomFieldSerializer.class);
+                if (annotation != null && annotation.fieldName().equals(field.getName())) {
+                    Type returnType = m.getReturnType();
+                    Type[] paramTypes = m.getParameterTypes();
+                    if (returnType.equals(SFSDataWrapper.class)
+                            && paramTypes.length == 1
+                            && paramTypes[0].equals(field.getType())) {
+                        return m;
+                    }
+                    throw new MetadataException("The annotated method '" + m.getName() + "' cannot be used for " +
+                            "custom field serialization! It must return SFSDataWrapper and receive " + field.getType() + "!");
+                }
+            }
+            return null;
+        }
 
         @SuppressWarnings("unchecked")
         private void readMetadata() {
@@ -172,16 +227,22 @@ public class SFSSerializer extends BasicService {
             final Method[] methods = getMethodsInClassHierarchy(entityClass);
 
             SFSSerializeStrategy sfsSerializeStrategy = findAnnotationInClassHierarchy(entityClass, SFSSerializeStrategy.class);
+            SFSSerializeIgnore ignoreClassFields = entityClass.getAnnotation(SFSSerializeIgnore.class);
             if (sfsSerializeStrategy != null) {
                 this.serializeStrategy = sfsSerializeStrategy.type();
             } else {
-                this.serializeStrategy = Strategy.DEFAULT;
+                this.serializeStrategy = SFSSerializeStrategy.Strategy.DEFAULT;
             }
 
             for (Field field : fields) {
+                // skip fields that are listed in the ignoreClasFields
+                if (ignoreClassFields != null && Arrays.asList(ignoreClassFields.fields()).contains(field.getName())) {
+                    continue;
+                }
+
                 // skip fields that are not mapped as serializable
                 SFSSerialize annotation = field.getAnnotation(SFSSerialize.class);
-                if ((annotation == null && this.serializeStrategy.equals(Strategy.ANNOTATED_FIELDS)) ||
+                if ((annotation == null && this.serializeStrategy.equals(SFSSerializeStrategy.Strategy.ANNOTATED_FIELDS)) ||
                         field.getAnnotation(SFSSerializeIgnore.class) != null) {
                     continue;
                 }
@@ -192,11 +253,17 @@ public class SFSSerializer extends BasicService {
                 FieldMeta meta = new FieldMeta((!isEmpty(config.name())) ? config.name() : field.getName());
                 meta.getter = findGetter(field);
                 meta.setter = findSetter(field);
+
+                if (meta.getter == null || meta.setter == null) {
+                    field.setAccessible(true);
+                }
                 meta.config = config;
 
-                meta.customDeserializer = findCustomDeserializer(methods, field);
-                meta.customSerializer = findCustomSerializer(methods, field);
+                meta.customFieldDeserializer = findCustomFieldDeserializer(methods, field);
+                meta.customFieldSerializer = findCustomFieldSerializer(methods, field);
                 meta.type = field.getType();
+                meta.field = field;
+                meta.fieldType = FieldType.UNKNOWN;
                 if (TransportObject.class.isAssignableFrom(field.getType())) {
                     meta.fieldType = FieldType.ENTITY;
                 } else if (isString(field.getType())) {
@@ -215,6 +282,9 @@ public class SFSSerializer extends BasicService {
                     meta.fieldType = FieldType.ENUM;
                     meta.genericType = field.getType();
                 } else if (Collection.class.isAssignableFrom(field.getType())) {
+                    meta.customListItemDeserializer = findCustomListItemDeserializer(methods, field);
+                    meta.customListItemSerializer = findCustomListItemSerializer(methods, field);
+                    meta.customListItemInitializer = findCustomListItemInitializer(methods, field);
                     Type[] typeArgs = getFieldTypeArguments(field);
                     if (typeArgs.length == 1) {
                         Type genericType = typeArgs[0];
@@ -231,10 +301,14 @@ public class SFSSerializer extends BasicService {
                         } else if (isString((Class<?>) genericType)) {
                             meta.fieldType = FieldType.STRING_ARRAY;
                             meta.genericType = (Class<String>) genericType;
+                        } else if (isLong((Class<?>) genericType)) {
+                            meta.fieldType = FieldType.LONG_ARRAY;
+                            meta.genericType = (Class<String>) genericType;
+                        } else if (Enum.class.isAssignableFrom((Class<?>) genericType)) {
+                            meta.fieldType = FieldType.ENUM_ARRAY;
+                            meta.genericType = (Class<Enum>) genericType;
                         }
                     }
-                } else {
-                    meta.fieldType = FieldType.UNKNOWN;
                 }
                 if (meta.fieldType != FieldType.UNKNOWN) {
                     entityFields.put(meta.name, meta);
@@ -250,27 +324,46 @@ public class SFSSerializer extends BasicService {
             }
         }
 
+        /**
+         * Set the field's value for an instance of an object
+         *
+         * @param obj       intance of entity
+         * @param fieldName field name
+         * @param value     field value
+         * @param <T>       instance type
+         */
         public <T extends TransportObject> void set(T obj, String fieldName, Object value) {
             checkField(fieldName);
             try {
                 FieldMeta fieldMeta = getEntityFields().get(fieldName);
                 if (fieldMeta.setter != null) {
                     fieldMeta.setter.invoke(obj, value);
+                } else {
+                    fieldMeta.field.set(obj, value);
                 }
             } catch (Exception e) {
-                logAndThrow(new MetadataException("Cannot invoke setter for field " + fieldName + " for object of " +
-                        "type " + entityClass + ":\n " + formatStackTrace(e)));
+                logAndThrow(new MetadataException("Cannot set field " + fieldName + " for object of " +
+                        "type " + entityClass + ":\n " + ExceptionUtil.formatStackTrace(e)));
             }
         }
 
+        /**
+         * Get the field's value for an instance of an object
+         *
+         * @param obj       instance of entity
+         * @param fieldName name of the field
+         */
         public Object get(T obj, String fieldName) {
             try {
                 Method getter = entityFields.get(fieldName).getter;
                 if (getter != null) {
                     return getter.invoke(obj);
+                } else {
+                    return getEntityFields().get(fieldName).field.get(obj);
                 }
             } catch (Exception e) {
-                logAndThrow(e);
+                logAndThrow(new MetadataException("Cannot get field " + fieldName + " for object of " +
+                        "type " + entityClass + ":\n " + ExceptionUtil.formatStackTrace(e)));
             }
             return null;
         }
@@ -298,22 +391,24 @@ public class SFSSerializer extends BasicService {
     }
 
     @SuppressWarnings("unchecked")
-    public <T extends TransportObject> ISFSObject serialize(T object) {
-        if (object != null) {
+    public <T extends TransportObject> ISFSObject serialize(T instance) {
+        if (instance != null) {
             ISFSObject result = new SFSObject();
-            Metadata<T> metadata = (Metadata<T>) getMetadata(object.getClass());
-            applyPreProcessors(object);
+            Metadata<T> metadata = (Metadata<T>) getMetadata(instance.getClass());
+            applyPreProcessors(instance);
             for (String fieldName : metadata.getEntityFields().keySet()) {
                 FieldMeta fieldMeta = metadata.getEntityFields().get(fieldName);
                 if (!fieldMeta.config.serialize()) {
                     continue;
                 }
-                Object value = metadata.get(object, fieldName);
+                Object value = metadata.get(instance, fieldName);
                 if (value == null) { // skip null values
                     continue;
                 }
                 try {
-                    switch (fieldMeta.fieldType) {
+                    if (fieldMeta.customFieldSerializer != null) {
+                        safePutValue(result, fieldName, (SFSDataWrapper) fieldMeta.customFieldSerializer.invoke(instance, value));
+                    } else switch (fieldMeta.fieldType) {
                         case BOOL:
                             safePutBoolean(result, fieldName, (Boolean) value);
                             break;
@@ -341,12 +436,18 @@ public class SFSSerializer extends BasicService {
                         case STRING_ARRAY:
                             result.putUtfStringArray(fieldName, (Collection<String>) value);
                             break;
+                        case ENUM_ARRAY:
+                            result.putUtfStringArray(fieldName, EnumUtil.toStringCollection((Collection<Enum>) value));
+                            break;
+                        case LONG_ARRAY:
+                            result.putLongArray(fieldName, (Collection<Long>) value);
+                            break;
                         case ENTITY_ARRAY:
                             final ISFSArray entityArray = new SFSArray();
                             for (Object entity : (Collection) value) {
                                 ISFSObject serializedValue;
-                                if (fieldMeta.customSerializer != null) {
-                                    serializedValue = (ISFSObject) fieldMeta.customSerializer.invoke(object, entity);
+                                if (fieldMeta.customListItemSerializer != null) {
+                                    serializedValue = (ISFSObject) fieldMeta.customListItemSerializer.invoke(instance, entity);
                                 } else {
                                     serializedValue = serialize((TransportObject) entity);
                                 }
@@ -360,12 +461,11 @@ public class SFSSerializer extends BasicService {
                     logAndThrow(new MetadataException(e));
                 }
             }
-            applyPostProcessors(result, object);
+            applyPostProcessors(result, instance);
             return result;
         }
         return null;
     }
-
 
     @SuppressWarnings("unchecked")
     public <T extends TransportObject> T deserialize(T instance, ISFSObject object) {
@@ -381,7 +481,9 @@ public class SFSSerializer extends BasicService {
                         continue;
                     }
                     Object value = null;
-                    switch (fieldMeta.fieldType) {
+                    if (fieldMeta.customFieldDeserializer != null) {
+                        value = fieldMeta.customFieldDeserializer.invoke(instance, object.get(fieldName));
+                    } else switch (fieldMeta.fieldType) {
                         case BOOL:
                             value = object.getBool(fieldName);
                             break;
@@ -409,6 +511,12 @@ public class SFSSerializer extends BasicService {
                         case STRING_ARRAY:
                             value = object.getUtfStringArray(fieldName);
                             break;
+                        case LONG_ARRAY:
+                            value = object.getLongArray(fieldName);
+                            break;
+                        case ENUM_ARRAY:
+                            value = EnumUtil.fromStringCollection((Class<Enum>) fieldMeta.genericType, object.getUtfStringArray(fieldName));
+                            break;
                         case ENTITY_ARRAY:
                             ISFSArray arrValue = object.getSFSArray(fieldName);
                             Iterator<SFSDataWrapper> iterator = arrValue.iterator();
@@ -416,9 +524,17 @@ public class SFSSerializer extends BasicService {
                             while (iterator.hasNext()) {
                                 SFSDataWrapper wrapper = iterator.next();
                                 if (wrapper.getTypeId() == SFSDataType.SFS_OBJECT) {
-                                    if (fieldMeta.customDeserializer != null) {
+                                    if (fieldMeta.customListItemDeserializer != null) {
                                         ((Collection) value).add(
-                                                fieldMeta.customDeserializer.invoke(instance, wrapper.getObject())
+                                                fieldMeta.customListItemDeserializer.invoke(instance, wrapper.getObject())
+                                        );
+                                    } else if (fieldMeta.customListItemInitializer != null) {
+                                        ((Collection) value).add(
+                                                deserialize(
+                                                        (TransportObject) fieldMeta.customListItemInitializer.invoke
+                                                                (instance, wrapper.getObject()),
+                                                        (ISFSObject) wrapper.getObject()
+                                                )
                                         );
                                     } else if (fieldMeta.genericType != null && !fieldMeta.genericType.isInterface()
                                             && !Modifier.isAbstract(fieldMeta.genericType.getModifiers())) {
@@ -427,6 +543,7 @@ public class SFSSerializer extends BasicService {
                                                         (Class<? extends TransportObject>) fieldMeta.genericType,
                                                         (ISFSObject) wrapper.getObject()
                                                 )
+
                                         );
                                     }
                                 }
@@ -454,4 +571,5 @@ public class SFSSerializer extends BasicService {
         }
         return null;
     }
+
 }

@@ -14,6 +14,6 @@ import java.lang.annotation.Target;
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SFSCustomListItemDeserializer {
-    public String listName();
+public @interface SFSCustomFieldSerializer {
+    public String fieldName();
 }

@@ -2,13 +2,13 @@ package me.smecsia.smartfox.tools.util;
 
 import com.smartfoxserver.v2.entities.data.ISFSArray;
 import com.smartfoxserver.v2.entities.data.ISFSObject;
-import me.smecsia.smartfox.tools.serialize.SFSSerializer;
+import com.smartfoxserver.v2.entities.data.SFSDataWrapper;
 import me.smecsia.smartfox.tools.common.TransportObject;
+import me.smecsia.smartfox.tools.serialize.SFSSerializer;
 
 import static org.apache.commons.lang.StringUtils.isEmpty;
 
 /**
- *
  * @author Ilya Sadykov
  *         Date: 11.10.12
  *         Time: 18:38
@@ -76,6 +76,13 @@ public class SFSObjectUtil {
     public static ISFSObject safePutBoolean(ISFSObject obj, String key, Boolean value) {
         if (value != null && obj != null && !isEmpty(key)) {
             obj.putBool(key, value);
+        }
+        return obj;
+    }
+
+    public static ISFSObject safePutValue(ISFSObject obj, String key, SFSDataWrapper value){
+        if (value != null && obj != null && !isEmpty(key)) {
+            obj.put(key, value);
         }
         return obj;
     }
