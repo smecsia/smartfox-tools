@@ -1,6 +1,7 @@
 package me.smecsia.smartfox.tools.serialize;
 
 import com.smartfoxserver.v2.entities.data.*;
+import me.smecsia.common.serialize.BasicTransportObject;
 import me.smecsia.common.serialize.SerializePostProcessor;
 import me.smecsia.common.serialize.SerializePreProcessor;
 import me.smecsia.common.serialize.TransportObject;
@@ -23,6 +24,20 @@ import static junit.framework.Assert.*;
  */
 public class SFSSerializerTest {
 
+    @Test
+    public void testBasicTransportObject() {
+        SFSSerializer serializer = new SFSSerializer();
+
+        ISFSObject input = new SFSObject();
+        input.putUtfString("name", "John");
+        input.putUtfString("surname", "Smith");
+        input.putLong("age", 50L);
+
+        BasicTransportObject to = serializer.deserialize(BasicTransportObject.class, input);
+        assertEquals("John", to.get("name"));
+        assertEquals("Smith", to.get("surname"));
+        assertEquals(50L, to.get("age"));
+    }
 
     @Test
     public void testDeserialize() {

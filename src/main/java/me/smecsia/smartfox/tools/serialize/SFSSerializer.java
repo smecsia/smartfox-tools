@@ -34,19 +34,19 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
             ArrayList<SerializePostProcessor>());
 
     private class FieldMeta {
-        public Method getter;
-        public Method setter;
-        public FieldType fieldType;
-        public Class<?> type;
-        public Class<?> genericType;
-        public Method customFieldSerializer;
-        public Method customFieldDeserializer;
-        public Method customListItemSerializer;
-        public Method customListItemDeserializer;
-        public Method customListItemInitializer;
-        public Field field;
-        public final String name;
-        public Serialize config;
+        Method getter;
+        Method setter;
+        FieldType fieldType;
+        Class<?> type;
+        Class<?> genericType;
+        Method customFieldSerializer;
+        Method customFieldDeserializer;
+        Method customListItemSerializer;
+        Method customListItemDeserializer;
+        Method customListItemInitializer;
+        Field field;
+        final String name;
+        Serialize config;
 
         private FieldMeta(String name) {
             this.name = name;
@@ -105,7 +105,8 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
         private Class<T> entityClass;
         private SerializeStrategy.Strategy serializeStrategy;
         private Map<String, FieldMeta> entityFields = new HashMap<String, FieldMeta>();
-        public Map<String, String[]> fieldsOptions = new HashMap<String, String[]>();
+        private Map<String, String[]> fieldsOptions = new HashMap<String, String[]>();
+        private FieldMeta missingFieldsStorage = null;
 
         public Metadata(Class<T> entityClass) {
             this.entityClass = entityClass;
@@ -187,6 +188,31 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
             return null;
         }
 
+        private void checkAndSetMissingFieldsStorage(Field f) {
+            MissingSerializeFieldsStorage annotation = f.getAnnotation(MissingSerializeFieldsStorage.class);
+            if (annotation != null) {
+                if (missingFieldsStorage != null) {
+                    throw new MetadataException("Class '" + entityClass + "' must have only 1 field " +
+                            "annotated with @MissingSerializeFieldsStorage!");
+                }
+                Type fieldType = f.getType();
+                Type[] typeArgs = getFieldTypeArguments(f);
+                if (Map.class.isAssignableFrom((Class<?>) fieldType) && typeArgs.length == 2 &&
+                        isString((Class<?>) typeArgs[0]) && Object.class.equals(typeArgs[1])) {
+                    missingFieldsStorage = new FieldMeta(f.getName());
+                    missingFieldsStorage.field = f;
+                    missingFieldsStorage.setter = findSetter(f);
+                    missingFieldsStorage.getter = findGetter(f);
+                    if (missingFieldsStorage.setter == null || missingFieldsStorage.getter == null) {
+                        f.setAccessible(true);
+                    }
+                } else {
+                    throw new MetadataException("Field '" + f.getName() + "' annotated as " +
+                            "@MissingSerializeFieldsStorage must be Map<String, Object>!");
+                }
+            }
+        }
+
         private Method findCustomFieldDeserializer(Method[] methods, Field field) {
             for (Method m : methods) {
                 CustomFieldDeserializer annotation = m.getAnnotation(CustomFieldDeserializer.class);
@@ -264,6 +290,8 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
 
                 meta.customFieldDeserializer = findCustomFieldDeserializer(methods, field);
                 meta.customFieldSerializer = findCustomFieldSerializer(methods, field);
+                checkAndSetMissingFieldsStorage(field);
+
                 meta.type = field.getType();
                 meta.field = field;
                 meta.fieldType = FieldType.UNKNOWN;
@@ -335,10 +363,8 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
          * @param value     field value
          * @param <T>       instance type
          */
-        private  <T extends TransportObject> void set(T obj, String fieldName, Object value) {
-            checkField(fieldName);
+        private <T extends TransportObject> void set(T obj, String fieldName, Object value, FieldMeta fieldMeta) {
             try {
-                FieldMeta fieldMeta = getEntityFields().get(fieldName);
                 if (fieldMeta.setter != null) {
                     fieldMeta.setter.invoke(obj, value);
                 } else {
@@ -350,15 +376,20 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
             }
         }
 
+        private <T extends TransportObject> void set(T obj, String fieldName, Object value) {
+            checkField(fieldName);
+            set(obj, fieldName, value, entityFields.get(fieldName));
+        }
+
         /**
          * Get the field's value for an instance of an object
          *
          * @param obj       instance of entity
          * @param fieldName name of the field
          */
-        private Object get(T obj, String fieldName) {
+        private Object get(T obj, String fieldName, FieldMeta fieldMeta) {
             try {
-                Method getter = entityFields.get(fieldName).getter;
+                Method getter = fieldMeta.getter;
                 if (getter != null) {
                     return getter.invoke(obj);
                 } else {
@@ -369,6 +400,10 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                         "type " + entityClass + ""));
             }
             return null;
+        }
+
+        private Object get(T obj, String fieldName) {
+            return get(obj, fieldName, entityFields.get(fieldName));
         }
 
     }
@@ -465,8 +500,45 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                     logAndThrow(new MetadataException(e));
                 }
             }
+            if (metadata.missingFieldsStorage != null) {
+                Map<String, Object> storage = (Map<String, Object>) metadata.get(instance,
+                        metadata.missingFieldsStorage.field.getName(), metadata.missingFieldsStorage);
+                for (String mFieldKey : storage.keySet()) {
+                    if (!metadata.getEntityFields().keySet().contains(mFieldKey)) {
+                        safePutDataWrapper(result, mFieldKey, newSfsDataWrapper(storage.get(mFieldKey)));
+                    }
+                }
+            }
             applyPostProcessors(result, instance);
             return result;
+        }
+        return null;
+    }
+
+    private SFSDataWrapper newSfsDataWrapper(Object value) {
+        if (value != null) {
+            SFSDataType dataType = null;
+            Class<?> valueClass = value.getClass();
+            if (isString(valueClass)) {
+                dataType = SFSDataType.UTF_STRING;
+            } else if (isLong(valueClass)) {
+                dataType = SFSDataType.LONG;
+            } else if (isInt(valueClass)) {
+                dataType = SFSDataType.INT;
+            } else if (isDouble(valueClass)) {
+                dataType = SFSDataType.DOUBLE;
+            } else if (isFloat(valueClass)) {
+                dataType = SFSDataType.FLOAT;
+            } else if (isBoolean(valueClass)) {
+                dataType = SFSDataType.BOOL;
+            } else if (value instanceof TransportObject) {
+                dataType = SFSDataType.SFS_OBJECT;
+                value = serialize((TransportObject) value);
+            }
+
+            if (dataType != null) {
+                return new SFSDataWrapper(dataType, value);
+            }
         }
         return null;
     }
@@ -479,6 +551,7 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                 logAndThrow(new MetadataException("Cannot deserialize to a null instance!"));
             }
             Metadata<T> metadata = (Metadata<T>) getMetadata(instance.getClass());
+            Map<String, Object> missedStorage = new HashMap<String, Object>();
             for (String fieldName : object.getKeys()) {
                 if (metadata.getEntityFields().containsKey(fieldName)) {
                     FieldMeta fieldMeta = metadata.getEntityFields().get(fieldName);
@@ -556,7 +629,12 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                             break;
                     }
                     metadata.set(instance, fieldName, value);
+                } else if (metadata.missingFieldsStorage != null) {
+                    missedStorage.put(fieldName, object.get(fieldName).getObject());
                 }
+            }
+            if (metadata.missingFieldsStorage != null) {
+                metadata.set(instance, metadata.missingFieldsStorage.name, missedStorage, metadata.missingFieldsStorage);
             }
             return instance;
         } catch (Exception e) {

@@ -17,6 +17,13 @@ public class SFSObjectUtil {
 
     private static final SFSSerializer SFS_SERIALIZER = new SFSSerializer();
 
+    public static ISFSObject safePutDataWrapper(ISFSObject obj, String key, SFSDataWrapper value) {
+        if (value != null && obj != null && !isEmpty(key)) {
+            obj.put(key, value);
+        }
+        return obj;
+    }
+
     public static ISFSObject safePutFloat(ISFSObject obj, String key, Float value) {
         if (value != null && obj != null && !isEmpty(key)) {
             obj.putFloat(key, value);
@@ -80,7 +87,7 @@ public class SFSObjectUtil {
         return obj;
     }
 
-    public static ISFSObject safePutValue(ISFSObject obj, String key, SFSDataWrapper value){
+    public static ISFSObject safePutValue(ISFSObject obj, String key, SFSDataWrapper value) {
         if (value != null && obj != null && !isEmpty(key)) {
             obj.put(key, value);
         }
