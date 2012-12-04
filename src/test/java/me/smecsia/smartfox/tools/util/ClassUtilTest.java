@@ -6,7 +6,6 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.fail;
 import static me.smecsia.smartfox.tools.util.ClassUtil.invokeAnyMethod;
 import static me.smecsia.smartfox.tools.util.ClassUtil.setPrivateField;
-import static me.smecsia.smartfox.tools.util.ExceptionUtil.formatStackTrace;
 
 /**
  * @author Ilya Sadykov
@@ -30,7 +29,7 @@ public class ClassUtilTest {
             assertEquals("set", testObject.privateField);
             assertEquals("set", TestClass.privateStatic);
         } catch (Exception e) {
-            fail("Method call must not throw an exception! \n" + formatStackTrace(e));
+            fail("Method call must not throw an exception! \n" + e.getMessage());
         }
     }
 

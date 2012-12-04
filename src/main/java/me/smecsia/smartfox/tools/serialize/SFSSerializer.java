@@ -1,12 +1,11 @@
 package me.smecsia.smartfox.tools.serialize;
 
 import com.smartfoxserver.v2.entities.data.*;
-import me.smecsia.smartfox.tools.annotations.*;
+import me.smecsia.common.serialize.*;
+import me.smecsia.common.serialize.annotations.*;
 import me.smecsia.smartfox.tools.common.BasicService;
-import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.error.MetadataException;
 import me.smecsia.smartfox.tools.util.EnumUtil;
-import me.smecsia.smartfox.tools.util.ExceptionUtil;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
@@ -21,7 +20,7 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
 /**
  * @author Ilya Sadykov
  */
-public class SFSSerializer extends BasicService {
+public class SFSSerializer extends BasicService implements TransportSerializer<ISFSObject> {
 
     private enum FieldType {
         LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, UNKNOWN
@@ -29,10 +28,10 @@ public class SFSSerializer extends BasicService {
 
     private static final Map<Class<? extends TransportObject>, Metadata> metaCache =
             new ConcurrentHashMap<Class<? extends TransportObject>, Metadata>();
-    private final List<SFSSerializePreProcessor> preProcessors = Collections.synchronizedList(new
-            ArrayList<SFSSerializePreProcessor>());
-    private final List<SFSSerializePostProcessor> postProcessors = Collections.synchronizedList(new
-            ArrayList<SFSSerializePostProcessor>());
+    private final List<SerializePreProcessor> preProcessors = Collections.synchronizedList(new
+            ArrayList<SerializePreProcessor>());
+    private final List<SerializePostProcessor> postProcessors = Collections.synchronizedList(new
+            ArrayList<SerializePostProcessor>());
 
     private class FieldMeta {
         public Method getter;
@@ -47,7 +46,7 @@ public class SFSSerializer extends BasicService {
         public Method customListItemInitializer;
         public Field field;
         public final String name;
-        public SFSSerialize config;
+        public Serialize config;
 
         private FieldMeta(String name) {
             this.name = name;
@@ -59,7 +58,8 @@ public class SFSSerializer extends BasicService {
      *
      * @param processor processor to be registered
      */
-    public void registerProcessor(SFSSerializeProcessor processor) {
+    @Override
+    public void registerProcessor(SerializeProcessor processor) {
         registerPreProcessor(processor);
         registerPostProcessor(processor);
     }
@@ -69,7 +69,8 @@ public class SFSSerializer extends BasicService {
      *
      * @param processor processor to be registered
      */
-    public void registerPreProcessor(SFSSerializePreProcessor processor) {
+    @Override
+    public void registerPreProcessor(SerializePreProcessor processor) {
         preProcessors.add(processor);
     }
 
@@ -78,18 +79,20 @@ public class SFSSerializer extends BasicService {
      *
      * @param processor processor to be registered
      */
-    public void registerPostProcessor(SFSSerializePostProcessor processor) {
+    @Override
+    public void registerPostProcessor(SerializePostProcessor processor) {
         postProcessors.add(processor);
     }
+
 
     /**
      * Read fields options for the class
      *
      * @param clazz
-     * @param <T>
      * @return options for each field
      */
-    public <T extends TransportObject> Map<String, String[]> getFieldsOptions(Class<T> clazz) {
+    @Override
+    public <DT extends TransportObject> Map<String, String[]> getFieldsOptions(Class<DT> clazz) {
         return getMetadata(clazz).fieldsOptions;
     }
 
@@ -100,7 +103,7 @@ public class SFSSerializer extends BasicService {
      */
     private class Metadata<T extends TransportObject> {
         private Class<T> entityClass;
-        private SFSSerializeStrategy.Strategy serializeStrategy;
+        private SerializeStrategy.Strategy serializeStrategy;
         private Map<String, FieldMeta> entityFields = new HashMap<String, FieldMeta>();
         public Map<String, String[]> fieldsOptions = new HashMap<String, String[]>();
 
@@ -138,7 +141,7 @@ public class SFSSerializer extends BasicService {
 
         private Method findCustomListItemInitializer(Method[] methods, Field field) {
             for (Method m : methods) {
-                SFSCustomListItemInitializer annotation = m.getAnnotation(SFSCustomListItemInitializer.class);
+                CustomListItemInitializer annotation = m.getAnnotation(CustomListItemInitializer.class);
                 if (annotation != null && annotation.listName().equals(field.getName())) {
                     return validateCustomListItemInitializerMethod(m);
                 }
@@ -158,7 +161,7 @@ public class SFSSerializer extends BasicService {
 
         private Method findCustomListItemDeserializer(Method[] methods, Field field) {
             for (Method m : methods) {
-                SFSCustomListItemDeserializer annotation = m.getAnnotation(SFSCustomListItemDeserializer.class);
+                CustomListItemDeserializer annotation = m.getAnnotation(CustomListItemDeserializer.class);
                 if (annotation != null && annotation.listName().equals(field.getName())) {
                     return validateCustomListItemInitializerMethod(m);
                 }
@@ -168,7 +171,7 @@ public class SFSSerializer extends BasicService {
 
         private Method findCustomListItemSerializer(Method[] methods, Field field) {
             for (Method m : methods) {
-                SFSCustomListItemSerializer annotation = m.getAnnotation(SFSCustomListItemSerializer.class);
+                CustomListItemSerializer annotation = m.getAnnotation(CustomListItemSerializer.class);
                 if (annotation != null && annotation.listName().equals(field.getName())) {
                     Type returnType = m.getReturnType();
                     Type[] paramTypes = m.getParameterTypes();
@@ -186,7 +189,7 @@ public class SFSSerializer extends BasicService {
 
         private Method findCustomFieldDeserializer(Method[] methods, Field field) {
             for (Method m : methods) {
-                SFSCustomFieldDeserializer annotation = m.getAnnotation(SFSCustomFieldDeserializer.class);
+                CustomFieldDeserializer annotation = m.getAnnotation(CustomFieldDeserializer.class);
                 if (annotation != null && annotation.fieldName().equals(field.getName())) {
                     Type returnType = m.getReturnType();
                     Type[] paramTypes = m.getParameterTypes();
@@ -205,7 +208,7 @@ public class SFSSerializer extends BasicService {
 
         private Method findCustomFieldSerializer(Method[] methods, Field field) {
             for (Method m : methods) {
-                SFSCustomFieldSerializer annotation = m.getAnnotation(SFSCustomFieldSerializer.class);
+                CustomFieldSerializer annotation = m.getAnnotation(CustomFieldSerializer.class);
                 if (annotation != null && annotation.fieldName().equals(field.getName())) {
                     Type returnType = m.getReturnType();
                     Type[] paramTypes = m.getParameterTypes();
@@ -226,12 +229,12 @@ public class SFSSerializer extends BasicService {
             final Field[] fields = getFieldsInClassHierarchy(entityClass);
             final Method[] methods = getMethodsInClassHierarchy(entityClass);
 
-            SFSSerializeStrategy sfsSerializeStrategy = findAnnotationInClassHierarchy(entityClass, SFSSerializeStrategy.class);
-            SFSSerializeIgnore ignoreClassFields = entityClass.getAnnotation(SFSSerializeIgnore.class);
-            if (sfsSerializeStrategy != null) {
-                this.serializeStrategy = sfsSerializeStrategy.type();
+            SerializeStrategy serializeStrategy = findAnnotationInClassHierarchy(entityClass, SerializeStrategy.class);
+            SerializeIgnore ignoreClassFields = entityClass.getAnnotation(SerializeIgnore.class);
+            if (serializeStrategy != null) {
+                this.serializeStrategy = serializeStrategy.type();
             } else {
-                this.serializeStrategy = SFSSerializeStrategy.Strategy.DEFAULT;
+                this.serializeStrategy = SerializeStrategy.Strategy.DEFAULT;
             }
 
             for (Field field : fields) {
@@ -241,14 +244,14 @@ public class SFSSerializer extends BasicService {
                 }
 
                 // skip fields that are not mapped as serializable
-                SFSSerialize annotation = field.getAnnotation(SFSSerialize.class);
-                if ((annotation == null && this.serializeStrategy.equals(SFSSerializeStrategy.Strategy.ANNOTATED_FIELDS)) ||
-                        field.getAnnotation(SFSSerializeIgnore.class) != null) {
+                Serialize annotation = field.getAnnotation(Serialize.class);
+                if ((annotation == null && this.serializeStrategy.equals(SerializeStrategy.Strategy.ANNOTATED_FIELDS)) ||
+                        field.getAnnotation(SerializeIgnore.class) != null) {
                     continue;
                 }
 
                 // building metadata
-                final SFSSerialize config = (annotation != null) ? annotation : SFSSerialize.DEFAULT.get();
+                final Serialize config = (annotation != null) ? annotation : Serialize.DEFAULT.get();
 
                 FieldMeta meta = new FieldMeta((!isEmpty(config.name())) ? config.name() : field.getName());
                 meta.getter = findGetter(field);
@@ -332,7 +335,7 @@ public class SFSSerializer extends BasicService {
          * @param value     field value
          * @param <T>       instance type
          */
-        public <T extends TransportObject> void set(T obj, String fieldName, Object value) {
+        private  <T extends TransportObject> void set(T obj, String fieldName, Object value) {
             checkField(fieldName);
             try {
                 FieldMeta fieldMeta = getEntityFields().get(fieldName);
@@ -343,7 +346,7 @@ public class SFSSerializer extends BasicService {
                 }
             } catch (Exception e) {
                 logAndThrow(new MetadataException("Cannot set field " + fieldName + " for object of " +
-                        "type " + entityClass + ":\n " + ExceptionUtil.formatStackTrace(e)));
+                        "type " + entityClass));
             }
         }
 
@@ -353,7 +356,7 @@ public class SFSSerializer extends BasicService {
          * @param obj       instance of entity
          * @param fieldName name of the field
          */
-        public Object get(T obj, String fieldName) {
+        private Object get(T obj, String fieldName) {
             try {
                 Method getter = entityFields.get(fieldName).getter;
                 if (getter != null) {
@@ -363,7 +366,7 @@ public class SFSSerializer extends BasicService {
                 }
             } catch (Exception e) {
                 logAndThrow(new MetadataException("Cannot get field " + fieldName + " for object of " +
-                        "type " + entityClass + ":\n " + ExceptionUtil.formatStackTrace(e)));
+                        "type " + entityClass + ""));
             }
             return null;
         }
@@ -371,13 +374,13 @@ public class SFSSerializer extends BasicService {
     }
 
     private <T extends TransportObject> void applyPreProcessors(T object) {
-        for (SFSSerializePreProcessor processor : preProcessors) {
+        for (SerializePreProcessor processor : preProcessors) {
             processor.process(object);
         }
     }
 
     private <T extends TransportObject> void applyPostProcessors(ISFSObject result, T object) {
-        for (SFSSerializePostProcessor processor : postProcessors) {
+        for (SerializePostProcessor processor : postProcessors) {
             processor.process(result, object);
         }
     }
@@ -391,6 +394,7 @@ public class SFSSerializer extends BasicService {
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T extends TransportObject> ISFSObject serialize(T instance) {
         if (instance != null) {
             ISFSObject result = new SFSObject();
@@ -468,6 +472,7 @@ public class SFSSerializer extends BasicService {
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T extends TransportObject> T deserialize(T instance, ISFSObject object) {
         try {
             if (instance == null) {
@@ -561,6 +566,7 @@ public class SFSSerializer extends BasicService {
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <T extends TransportObject> T deserialize(Class<T> clazz, ISFSObject object) {
         if (object != null) {
             try {

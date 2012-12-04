@@ -29,6 +29,11 @@
 
     <dependencies>
         <dependency>
+            <artifactId>smecsia-common-api</artifactId>
+            <groupId>me.smecsia.common</groupId>
+            <version>0.1</version>
+        </dependency>
+        <dependency>
             <artifactId>smartfox</artifactId>
             <groupId>smartfox-2x-server</groupId>
             <version>${smartfox.version}</version>

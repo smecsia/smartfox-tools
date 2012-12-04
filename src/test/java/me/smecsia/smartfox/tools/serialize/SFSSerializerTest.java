@@ -1,9 +1,11 @@
 package me.smecsia.smartfox.tools.serialize;
 
 import com.smartfoxserver.v2.entities.data.*;
-import me.smecsia.smartfox.tools.annotations.*;
+import me.smecsia.common.serialize.SerializePostProcessor;
+import me.smecsia.common.serialize.SerializePreProcessor;
+import me.smecsia.common.serialize.TransportObject;
+import me.smecsia.common.serialize.annotations.*;
 import me.smecsia.smartfox.tools.common.AbstractTransportObject;
-import me.smecsia.smartfox.tools.common.TransportObject;
 import me.smecsia.smartfox.tools.util.SFSObjectUtil;
 import org.junit.Test;
 
@@ -82,16 +84,16 @@ public class SFSSerializerTest {
         entity.setWildcardList(Arrays.asList(subEntity));
         entity.setWildcardedListCustom(Arrays.asList(subEntityCustom));
 
-        sfsSerializer.registerPostProcessor(new SFSSerializePostProcessor() {
+        sfsSerializer.registerPostProcessor(new SerializePostProcessor() {
             @Override
-            public <T extends TransportObject> void process(ISFSObject result, T sourceObject) {
+            public <ST, DT extends TransportObject> void process(ST result, DT sourceObject) {
                 if (sourceObject instanceof Entity)
-                    result.putBool("postProcessed", true);
+                    ((ISFSObject) result).putBool("postProcessed", true);
             }
         });
-        sfsSerializer.registerPreProcessor(new SFSSerializePreProcessor() {
+        sfsSerializer.registerPreProcessor(new SerializePreProcessor() {
             @Override
-            public <T extends TransportObject> void process(T sourceObject) {
+            public <DT> void process(DT sourceObject) {
                 if (sourceObject instanceof Entity)
                     ((Entity) sourceObject).setPreProcessed(true);
             }
@@ -182,9 +184,9 @@ public class SFSSerializerTest {
 
     public static class SubEntity extends AbstractTransportObject {
 
-        @SFSSerialize
+        @Serialize
         private Long longField;
-        @SFSSerialize
+        @Serialize
         private List<String> stringsList;
 
         public List<String> getStringsList() {
@@ -211,8 +213,8 @@ public class SFSSerializerTest {
         }
     }
 
-    @SFSSerializeStrategy(type = SFSSerializeStrategy.Strategy.ALL_FIELDS)
-    @SFSSerializeIgnore(fields = {"totallyIgnoredField"})
+    @SerializeStrategy(type = SerializeStrategy.Strategy.ALL_FIELDS)
+    @SerializeIgnore(fields = {"totallyIgnoredField"})
     public static class Entity extends AbstractTransportObject {
         public static enum Color {white, black}
 
@@ -220,47 +222,47 @@ public class SFSSerializerTest {
         private String stringField;
         private SubEntity subEntity;
         private List<SubEntity> subEntities;
-        @SFSSerialize(deserialize = false)
+        @Serialize(deserialize = false)
         private String notDeserializable;
-        @SFSSerialize(serialize = false)
+        @Serialize(serialize = false)
         private String notSerializable;
         private List<? extends TransportObject> wildcardList;
         private List<? extends TransportObject> wildcardedListCustom;
         private Color enumField;
         private Boolean preProcessed = false;
-        @SFSSerializeIgnore
+        @SerializeIgnore
         private String ignoredField = "ignoredValue";
-        @SFSSerialize(name = "changedName")
+        @Serialize(name = "changedName")
         private String nameToBeChanged = "value";
-        @SFSSerialize
+        @Serialize
         private List<Color> colors;
         private String fieldWithoutGetter;
         private Long fieldCustomSerializable;
         private String totallyIgnoredField = null;
 
-        @SFSCustomListItemInitializer(listName = "wildcardedListCustom")
+        @CustomListItemInitializer(listName = "wildcardedListCustom")
         public TransportObject initializeWildCardedListItem(ISFSObject object) {
             return new SubEntity();
         }
 
-        @SFSCustomFieldDeserializer(fieldName = "fieldCustomSerializable")
+        @CustomFieldDeserializer(fieldName = "fieldCustomSerializable")
         public Long customDeserializeCustomField(SFSDataWrapper wrapper) {
             return Long.valueOf((Integer) wrapper.getObject());
         }
 
-        @SFSCustomFieldSerializer(fieldName = "fieldCustomSerializable")
+        @CustomFieldSerializer(fieldName = "fieldCustomSerializable")
         public SFSDataWrapper customSerializeCustomField(Long value) {
             return new SFSDataWrapper(SFSDataType.INT, value.intValue());
         }
 
-        @SFSCustomListItemDeserializer(listName = "wildcardList")
+        @CustomListItemDeserializer(listName = "wildcardList")
         public TransportObject deserializeWildcardItem(ISFSObject object) {
             SubEntity res = new SubEntity();
             res.setLongField(object.getLong("longField"));
             return res;
         }
 
-        @SFSCustomListItemSerializer(listName = "wildcardList")
+        @CustomListItemSerializer(listName = "wildcardList")
         public ISFSObject serializeWildcardItem(TransportObject object) {
             ISFSObject res = SFSObjectUtil.serialize(object);
             if (object instanceof Entity) {

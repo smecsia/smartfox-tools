@@ -3,7 +3,7 @@ package me.smecsia.smartfox.tools.util;
 import com.smartfoxserver.v2.entities.data.ISFSArray;
 import com.smartfoxserver.v2.entities.data.ISFSObject;
 import com.smartfoxserver.v2.entities.data.SFSDataWrapper;
-import me.smecsia.smartfox.tools.common.TransportObject;
+import me.smecsia.common.serialize.TransportObject;
 import me.smecsia.smartfox.tools.serialize.SFSSerializer;
 
 import static org.apache.commons.lang.StringUtils.isEmpty;

@@ -1,8 +1,10 @@
 package me.smecsia.smartfox.tools.common;
 
 import com.smartfoxserver.v2.entities.data.ISFSObject;
+import me.smecsia.common.serialize.TransportObject;
 
-import static me.smecsia.smartfox.tools.util.SFSObjectUtil.*;
+import static me.smecsia.smartfox.tools.util.SFSObjectUtil.deserialize;
+import static me.smecsia.smartfox.tools.util.SFSObjectUtil.serialize;
 
 /**
  *
