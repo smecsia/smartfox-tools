@@ -10,12 +10,11 @@ import me.smecsia.smartfox.tools.common.AbstractTransportObject;
 import me.smecsia.smartfox.tools.util.SFSObjectUtil;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 import static junit.framework.Assert.*;
+import static me.smecsia.smartfox.tools.serialize.SFSSerializer.DEFAULT_DATE_FORMAT;
 
 /**
  * @author Ilya Sadykov
@@ -55,6 +54,7 @@ public class SFSSerializerTest {
         entityObj.putUtfString("fieldWithoutGetter", "value");
         entityObj.putInt("fieldCustomSerializable", 10);
         entityObj.putUtfString("totallyIgnoredField", "value");
+        entityObj.putUtfString("date", "2012-12-08 12:00:00");
 
         entityObj.putUtfStringArray("colors", Arrays.asList("black", "black", "white"));
 
@@ -80,6 +80,7 @@ public class SFSSerializerTest {
         assertNull(entity.getNotDeserializable());
         assertNull(entity.totallyIgnoredField);
         assertEquals(subEntityObj.getLong("longField"), entity.getSubEntity().getLongField());
+        assertEquals("2012-12-08 12:00:00", new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(entity.date));
 
         assertNotNull(entity.getSubEntities());
         assertFalse(entity.getSubEntities().isEmpty());
@@ -172,6 +173,7 @@ public class SFSSerializerTest {
         entity.setColors(Arrays.asList(Entity.Color.black, Entity.Color.white));
         entity.fieldCustomSerializable = 20L;
         entity.totallyIgnoredField = "value";
+        entity.date = new Date();
 
         ISFSObject sObj = sfsSerializer.serialize(entity);
 
@@ -180,6 +182,7 @@ public class SFSSerializerTest {
         assertEquals(entity.getEnumField().name(), sObj.getUtfString("enumField"));
         assertEquals(entity.getNameToBeChanged(), sObj.getUtfString("changedName"));
         assertEquals(entity.getNotDeserializable(), sObj.getUtfString("notDeserializable"));
+        assertEquals(new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(entity.date), sObj.getUtfString("date"));
         assertEquals(20, sObj.getInt("fieldCustomSerializable").intValue());
         Collection<String> colors = sObj.getUtfStringArray("colors");
         assertTrue(colors.contains(entity.getColors().get(1).name()));
@@ -254,6 +257,7 @@ public class SFSSerializerTest {
         private String fieldWithoutGetter;
         private Long fieldCustomSerializable;
         private String totallyIgnoredField = null;
+        private Date date;
 
         @CustomListItemInitializer(listName = "wildcardedListCustom")
         public TransportObject initializeWildCardedListItem(ISFSObject object) {

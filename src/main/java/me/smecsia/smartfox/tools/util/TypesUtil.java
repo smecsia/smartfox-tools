@@ -19,7 +19,6 @@ public class TypesUtil {
      */
     public static boolean isInt(Class<?> type) {
         return Integer.class.isAssignableFrom(type) || (type.isPrimitive() && type.toString().equals("int"));
-
     }
 
     /**
@@ -73,7 +72,18 @@ public class TypesUtil {
     }
 
     /**
+     * Checks if the fieldType is Date
+     *
+     * @param type - java fieldType
+     * @return true if the given fieldType is date
+     */
+    public static boolean isDate(Class<?> type) {
+        return Date.class.isAssignableFrom(type);
+    }
+
+    /**
      * Instantiate the collection by its class
+     *
      * @param collClass
      * @return
      */

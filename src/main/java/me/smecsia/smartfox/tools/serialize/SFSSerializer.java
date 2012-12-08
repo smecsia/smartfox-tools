@@ -9,6 +9,7 @@ import me.smecsia.smartfox.tools.util.EnumUtil;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,8 +23,12 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  */
 public class SFSSerializer extends BasicService implements TransportSerializer<ISFSObject> {
 
+    public static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
     private enum FieldType {
-        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, UNKNOWN
+        LONG, INT, BOOL, FLOAT, DOUBLE, STRING, DATE,
+        STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM,
+        UNKNOWN
     }
 
     private static final Map<Class<? extends TransportObject>, Metadata> metaCache =
@@ -309,6 +314,8 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                     meta.fieldType = FieldType.BOOL;
                 } else if (isInt(field.getType())) {
                     meta.fieldType = FieldType.INT;
+                } else if (isDate(field.getType())) {
+                    meta.fieldType = FieldType.DATE;
                 } else if (Enum.class.isAssignableFrom(field.getType())) {
                     meta.fieldType = FieldType.ENUM;
                     meta.genericType = field.getType();
@@ -469,6 +476,9 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                         case ENTITY:
                             safePutSFSObject(result, fieldName, serialize((TransportObject) value));
                             break;
+                        case DATE:
+                            safePutString(result, fieldName, new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(value));
+                            break;
                         case ENUM:
                             safePutString(result, fieldName, ((Enum) value).name());
                             break;
@@ -582,6 +592,9 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                             break;
                         case ENTITY:
                             value = deserialize((Class<T>) fieldMeta.type, object.getSFSObject(fieldName));
+                            break;
+                        case DATE:
+                            value = new SimpleDateFormat(DEFAULT_DATE_FORMAT).parse(object.getUtfString(fieldName));
                             break;
                         case ENUM:
                             value = EnumUtil.fromString((Class<Enum>) fieldMeta.genericType, object.getUtfString(fieldName));
