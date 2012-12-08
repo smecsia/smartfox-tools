@@ -4,6 +4,7 @@ This is a small library helping you to implement your own extension for SmartFox
 
 ## Release notes
 
+* 0.7 - Add support for dates serialization.
 * 0.6 - Externalize the serializer API
 * 0.5 - SFSSerializer now supports custom serialize post/pre processors & custom field serializer/deserializer.
 * 0.3 - SFSSerializer support for enums / list of enums.
@@ -71,7 +72,7 @@ to see how to do it. Or you can start with [this example](https://github.com/sme
         <dependency>
             <groupId>me.smecsia.smartfox</groupId>
             <artifactId>smartfox-tools</artifactId>
-            <version>0.6</version>
+            <version>0.7</version>
         </dependency>
     </dependencies>
     <!-- ... -->
