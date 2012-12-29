@@ -1,4 +1,4 @@
-# SmartFox Server Tools library
+# SmartFox Server Tools library [![Build Status](https://travis-ci.org/smecsia/smartfox-tools.png)](https://travis-ci.org/smecsia/smartfox-tools)
 
 This is a small library helping you to implement your own extension for SmartFox Server
 
