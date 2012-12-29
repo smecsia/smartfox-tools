@@ -95,14 +95,21 @@ public class ClassUtil {
      * @return Type arguments array
      */
     public static Type[] getFieldTypeArguments(Field field) {
-        Type genericFieldType = field.getGenericType();
+        return getTypeArguments(field.getGenericType());
+    }
+
+    /**
+     * Returns type arguments
+     * @param genericFieldType generic type
+     * @return Type arguments array
+     */
+    public static Type[] getTypeArguments(Type genericFieldType) {
         if (genericFieldType instanceof ParameterizedType) {
             ParameterizedType aType = (ParameterizedType) genericFieldType;
             return aType.getActualTypeArguments();
         }
         return new Type[]{};
     }
-
 
     /**
      * Invokes any object method (even if it's private)

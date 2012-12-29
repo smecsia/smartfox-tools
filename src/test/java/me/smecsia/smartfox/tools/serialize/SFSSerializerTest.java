@@ -56,6 +56,14 @@ public class SFSSerializerTest {
         entityObj.putUtfString("totallyIgnoredField", "value");
         entityObj.putUtfString("date", "2012-12-08 12:00:00");
 
+        ISFSObject entityMapObj = new SFSObject();
+        entityMapObj.putSFSObject("entityMap", subEntityObj);
+        entityObj.putSFSObject("entityMap", entityMapObj);
+
+        ISFSObject stringMapObj = new SFSObject();
+        stringMapObj.putUtfString("stringMapField", "stringMapValue");
+        entityObj.putSFSObject("stringMap", stringMapObj);
+
         entityObj.putUtfStringArray("colors", Arrays.asList("black", "black", "white"));
 
         ISFSArray subArray = new SFSArray();
@@ -82,6 +90,8 @@ public class SFSSerializerTest {
         assertEquals(subEntityObj.getLong("longField"), entity.getSubEntity().getLongField());
         assertEquals("2012-12-08 12:00:00", new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(entity.date));
 
+        assertEquals(20L, entity.entityMap.get("entityMap").getLongField().longValue());
+        assertEquals("stringMapValue", entity.stringMap.get("stringMapField"));
         assertNotNull(entity.getSubEntities());
         assertFalse(entity.getSubEntities().isEmpty());
         assertEquals(30L, entity.getSubEntities().get(0).getLongField().longValue());
@@ -175,6 +185,9 @@ public class SFSSerializerTest {
         entity.totallyIgnoredField = "value";
         entity.date = new Date();
 
+        entity.entityMap.put("entityMapField", new SubEntity(99L));
+        entity.stringMap.put("stringMapField", "stringMapValue");
+
         ISFSObject sObj = sfsSerializer.serialize(entity);
 
         assertEquals(entity.getIntField(), sObj.getInt("intField"));
@@ -193,6 +206,10 @@ public class SFSSerializerTest {
         assertNotNull(sObj.getSFSObject("subEntity"));
         assertEquals(subEntity.getLongField(), sObj.getSFSObject("subEntity").getLong("longField"));
         assertNotNull(sObj.getSFSArray("subEntities"));
+        assertNotNull(sObj.getSFSObject("entityMap"));
+        assertEquals(99L, sObj.getSFSObject("entityMap").getSFSObject("entityMapField").getLong("longField").longValue());
+        assertNotNull(sObj.getSFSObject("stringMap"));
+        assertEquals("stringMapValue", sObj.getSFSObject("stringMap").getUtfString("stringMapField"));
         Iterator<SFSDataWrapper> iterator = sObj.getSFSArray("subEntities").iterator();
         assertEquals(100L, ((SFSObject) iterator.next().getObject()).getLong("longField").longValue());
 
@@ -258,6 +275,8 @@ public class SFSSerializerTest {
         private Long fieldCustomSerializable;
         private String totallyIgnoredField = null;
         private Date date;
+        private Map<String, SubEntity> entityMap = new HashMap<String, SubEntity>();
+        private Map<String, String> stringMap = new HashMap<String, String>();
 
         @CustomListItemInitializer(listName = "wildcardedListCustom")
         public TransportObject initializeWildCardedListItem(ISFSObject object) {

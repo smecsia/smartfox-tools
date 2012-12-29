@@ -4,6 +4,7 @@ This is a small library helping you to implement your own extension for SmartFox
 
 ## Release notes
 
+* 0.9 - Support for maps serialization.
 * 0.7 - Add support for dates serialization.
 * 0.6 - Externalize the serializer API
 * 0.5 - SFSSerializer now supports custom serialize post/pre processors & custom field serializer/deserializer.
@@ -20,12 +21,6 @@ You can easily serialize and deserialize your objects from/to ISFSObject:
 ```java
 class MyObject extends AbstractTransportObject {
     private Integer field;
-    public Integer getField(){
-        return field;
-    }
-    public void setField(Integer field){
-        this.field = field;
-    }
 }
 // ...
 MyObject obj = new MyObject();
@@ -72,7 +67,7 @@ to see how to do it. Or you can start with [this example](https://github.com/sme
         <dependency>
             <groupId>me.smecsia.smartfox</groupId>
             <artifactId>smartfox-tools</artifactId>
-            <version>0.7</version>
+            <version>0.9</version>
         </dependency>
     </dependencies>
     <!-- ... -->

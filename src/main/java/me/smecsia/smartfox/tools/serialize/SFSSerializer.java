@@ -9,6 +9,7 @@ import me.smecsia.smartfox.tools.util.EnumUtil;
 import org.apache.commons.lang.WordUtils;
 
 import java.lang.reflect.*;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,8 +28,8 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
 
     private enum FieldType {
         LONG, INT, BOOL, FLOAT, DOUBLE, STRING, DATE,
-        STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM,
-        UNKNOWN
+        STRING_ARRAY, LONG_ARRAY, ENUM_ARRAY, ENTITY, ENTITY_ARRAY, ENUM, MAP,
+        CUSTOM, UNKNOWN
     }
 
     private static final Map<Class<? extends TransportObject>, Metadata> metaCache =
@@ -42,6 +43,7 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
         Method getter;
         Method setter;
         FieldType fieldType;
+        FieldType subFieldType;
         Class<?> type;
         Class<?> genericType;
         Method customFieldSerializer;
@@ -299,60 +301,89 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
 
                 meta.type = field.getType();
                 meta.field = field;
-                meta.fieldType = FieldType.UNKNOWN;
-                if (TransportObject.class.isAssignableFrom(field.getType())) {
-                    meta.fieldType = FieldType.ENTITY;
-                } else if (isString(field.getType())) {
-                    meta.fieldType = FieldType.STRING;
-                } else if (isLong(field.getType())) {
-                    meta.fieldType = FieldType.LONG;
-                } else if (isDouble(field.getType())) {
-                    meta.fieldType = FieldType.DOUBLE;
-                } else if (isFloat(field.getType())) {
-                    meta.fieldType = FieldType.FLOAT;
-                } else if (isBoolean(field.getType())) {
-                    meta.fieldType = FieldType.BOOL;
-                } else if (isInt(field.getType())) {
-                    meta.fieldType = FieldType.INT;
-                } else if (isDate(field.getType())) {
-                    meta.fieldType = FieldType.DATE;
-                } else if (Enum.class.isAssignableFrom(field.getType())) {
-                    meta.fieldType = FieldType.ENUM;
-                    meta.genericType = field.getType();
-                } else if (Collection.class.isAssignableFrom(field.getType())) {
-                    meta.customListItemDeserializer = findCustomListItemDeserializer(methods, field);
-                    meta.customListItemSerializer = findCustomListItemSerializer(methods, field);
-                    meta.customListItemInitializer = findCustomListItemInitializer(methods, field);
-                    Type[] typeArgs = getFieldTypeArguments(field);
-                    if (typeArgs.length == 1) {
-                        Type genericType = typeArgs[0];
-                        if (typeArgs[0] instanceof WildcardType) {
-                            Type[] bounds = ((WildcardType) typeArgs[0]).getUpperBounds();
-                            if (bounds.length == 1 && TransportObject.class.isAssignableFrom((Class<?>) bounds[0])) {
-                                meta.fieldType = FieldType.ENTITY_ARRAY;
-                                genericType = bounds[0];
-                            }
+                meta.fieldType = getFieldType(field.getType(), getFieldTypeArguments(field));
+                Type[] typeArgs;
+                switch (meta.fieldType) {
+                    case ENTITY_ARRAY:
+                    case ENUM_ARRAY:
+                    case LONG_ARRAY:
+                    case STRING_ARRAY:
+                        meta.customListItemDeserializer = findCustomListItemDeserializer(methods, field);
+                        meta.customListItemSerializer = findCustomListItemSerializer(methods, field);
+                        meta.customListItemInitializer = findCustomListItemInitializer(methods, field);
+                        typeArgs = getFieldTypeArguments(field);
+                        meta.genericType = (Class<?>) getGenericType(typeArgs[0]);
+                        break;
+                    case MAP:
+                        typeArgs = getFieldTypeArguments(field);
+                        Type[] typeArguments = getTypeArguments(meta.genericType);
+                        if (typeArguments.length > 0) {
+                            meta.genericType = (Class<?>) typeArguments[0];
                         }
-                        if (TransportObject.class.isAssignableFrom((Class<?>) genericType)) {
-                            meta.fieldType = FieldType.ENTITY_ARRAY;
-                            meta.genericType = (Class<? extends TransportObject>) genericType;
-                        } else if (isString((Class<?>) genericType)) {
-                            meta.fieldType = FieldType.STRING_ARRAY;
-                            meta.genericType = (Class<String>) genericType;
-                        } else if (isLong((Class<?>) genericType)) {
-                            meta.fieldType = FieldType.LONG_ARRAY;
-                            meta.genericType = (Class<String>) genericType;
-                        } else if (Enum.class.isAssignableFrom((Class<?>) genericType)) {
-                            meta.fieldType = FieldType.ENUM_ARRAY;
-                            meta.genericType = (Class<Enum>) genericType;
-                        }
-                    }
+                        meta.type = (Class<?>) getGenericType(typeArgs[1]);
+                        meta.subFieldType = getFieldType(meta.type, typeArguments);
+                        break;
+                }
+                if (meta.fieldType.equals(FieldType.UNKNOWN) &&
+                        meta.customFieldSerializer != null && meta.customFieldDeserializer != null) {
+                    meta.fieldType = FieldType.CUSTOM;
                 }
                 if (meta.fieldType != FieldType.UNKNOWN) {
                     entityFields.put(meta.name, meta);
                     fieldsOptions.put(meta.name, meta.config.options());
                 }
             }
+        }
+
+        private Type getGenericType(Type typeArg) {
+            Type genericType = typeArg;
+            if (typeArg instanceof WildcardType) {
+                Type[] bounds = ((WildcardType) typeArg).getUpperBounds();
+                if (bounds.length == 1 && TransportObject.class.isAssignableFrom((Class<?>) bounds[0])) {
+                    genericType = bounds[0];
+                }
+            }
+            return genericType;
+        }
+
+        private FieldType getFieldType(Class<?> type, Type[] typeArgs) {
+            if (TransportObject.class.isAssignableFrom(type)) {
+                return FieldType.ENTITY;
+            } else if (isString(type)) {
+                return FieldType.STRING;
+            } else if (isLong(type)) {
+                return FieldType.LONG;
+            } else if (isDouble(type)) {
+                return FieldType.DOUBLE;
+            } else if (isFloat(type)) {
+                return FieldType.FLOAT;
+            } else if (isBoolean(type)) {
+                return FieldType.BOOL;
+            } else if (isInt(type)) {
+                return FieldType.INT;
+            } else if (isDate(type)) {
+                return FieldType.DATE;
+            } else if (Enum.class.isAssignableFrom(type)) {
+                return FieldType.ENUM;
+            } else if (Collection.class.isAssignableFrom(type)) {
+                if (typeArgs.length == 1) {
+                    Type genericType = getGenericType(typeArgs[0]);
+                    if (TransportObject.class.isAssignableFrom((Class<?>) genericType)) {
+                        return FieldType.ENTITY_ARRAY;
+                    } else if (isString((Class<?>) genericType)) {
+                        return FieldType.STRING_ARRAY;
+                    } else if (isLong((Class<?>) genericType)) {
+                        return FieldType.LONG_ARRAY;
+                    } else if (Enum.class.isAssignableFrom((Class<?>) genericType)) {
+                        return FieldType.ENUM_ARRAY;
+                    }
+                }
+            } else if (Map.class.isAssignableFrom(type)) {
+                if (typeArgs.length == 2 && isString((Class<?>) typeArgs[0])) {
+                    return FieldType.MAP;
+                }
+            }
+            return FieldType.UNKNOWN;
         }
 
         private void checkField(String fieldName) {
@@ -456,40 +487,26 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                         safePutValue(result, fieldName, (SFSDataWrapper) fieldMeta.customFieldSerializer.invoke(instance, value));
                     } else switch (fieldMeta.fieldType) {
                         case BOOL:
-                            safePutBoolean(result, fieldName, (Boolean) value);
-                            break;
                         case FLOAT:
-                            safePutFloat(result, fieldName, (Float) value);
-                            break;
                         case DOUBLE:
-                            safePutDouble(result, fieldName, (Double) value);
-                            break;
                         case INT:
-                            safePutInt(result, fieldName, (Integer) value);
-                            break;
                         case LONG:
-                            safePutLong(result, fieldName, (Long) value);
-                            break;
                         case STRING:
-                            safePutString(result, fieldName, (String) value);
-                            break;
                         case ENTITY:
-                            safePutSFSObject(result, fieldName, serialize((TransportObject) value));
-                            break;
                         case DATE:
-                            safePutString(result, fieldName, new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(value));
-                            break;
                         case ENUM:
-                            safePutString(result, fieldName, ((Enum) value).name());
-                            break;
                         case STRING_ARRAY:
-                            result.putUtfStringArray(fieldName, (Collection<String>) value);
-                            break;
                         case ENUM_ARRAY:
-                            result.putUtfStringArray(fieldName, EnumUtil.toStringCollection((Collection<Enum>) value));
-                            break;
                         case LONG_ARRAY:
-                            result.putLongArray(fieldName, (Collection<Long>) value);
+                            serializeValue(result, fieldName, fieldMeta.fieldType, value);
+                            break;
+                        case MAP:
+                            ISFSObject mapObj = new SFSObject();
+                            for (Object keyObj : ((Map) value).keySet()) {
+                                String key = (String) keyObj;
+                                serializeValue(mapObj, key, fieldMeta.subFieldType, ((Map) value).get(keyObj));
+                            }
+                            result.putSFSObject(fieldName, mapObj);
                             break;
                         case ENTITY_ARRAY:
                             final ISFSArray entityArray = new SFSArray();
@@ -523,6 +540,47 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
             return result;
         }
         return null;
+    }
+
+    private void serializeValue(ISFSObject result, String fieldName, FieldType fieldType, Object value) {
+        switch (fieldType) {
+            case BOOL:
+                safePutBoolean(result, fieldName, (Boolean) value);
+                break;
+            case FLOAT:
+                safePutFloat(result, fieldName, (Float) value);
+                break;
+            case DOUBLE:
+                safePutDouble(result, fieldName, (Double) value);
+                break;
+            case INT:
+                safePutInt(result, fieldName, (Integer) value);
+                break;
+            case LONG:
+                safePutLong(result, fieldName, (Long) value);
+                break;
+            case STRING:
+                safePutString(result, fieldName, (String) value);
+                break;
+            case ENTITY:
+                safePutSFSObject(result, fieldName, serialize((TransportObject) value));
+                break;
+            case DATE:
+                safePutString(result, fieldName, new SimpleDateFormat(DEFAULT_DATE_FORMAT).format(value));
+                break;
+            case ENUM:
+                safePutString(result, fieldName, ((Enum) value).name());
+                break;
+            case STRING_ARRAY:
+                result.putUtfStringArray(fieldName, (Collection<String>) value);
+                break;
+            case ENUM_ARRAY:
+                result.putUtfStringArray(fieldName, EnumUtil.toStringCollection((Collection<Enum>) value));
+                break;
+            case LONG_ARRAY:
+                result.putLongArray(fieldName, (Collection<Long>) value);
+                break;
+        }
     }
 
     private SFSDataWrapper newSfsDataWrapper(Object value) {
@@ -573,40 +631,29 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
                         value = fieldMeta.customFieldDeserializer.invoke(instance, object.get(fieldName));
                     } else switch (fieldMeta.fieldType) {
                         case BOOL:
-                            value = object.getBool(fieldName);
-                            break;
                         case FLOAT:
-                            value = object.getFloat(fieldName);
-                            break;
                         case DOUBLE:
-                            value = object.getDouble(fieldName);
-                            break;
                         case INT:
-                            value = object.getInt(fieldName);
-                            break;
                         case LONG:
-                            value = object.getLong(fieldName);
-                            break;
                         case STRING:
-                            value = object.getUtfString(fieldName);
-                            break;
                         case ENTITY:
-                            value = deserialize((Class<T>) fieldMeta.type, object.getSFSObject(fieldName));
-                            break;
                         case DATE:
-                            value = new SimpleDateFormat(DEFAULT_DATE_FORMAT).parse(object.getUtfString(fieldName));
-                            break;
                         case ENUM:
-                            value = EnumUtil.fromString((Class<Enum>) fieldMeta.genericType, object.getUtfString(fieldName));
-                            break;
                         case STRING_ARRAY:
-                            value = object.getUtfStringArray(fieldName);
-                            break;
                         case LONG_ARRAY:
-                            value = object.getLongArray(fieldName);
-                            break;
                         case ENUM_ARRAY:
-                            value = EnumUtil.fromStringCollection((Class<Enum>) fieldMeta.genericType, object.getUtfStringArray(fieldName));
+                            value = deserializeValue(object, fieldMeta.fieldType, fieldMeta.name,
+                                    fieldMeta.type, fieldMeta.genericType);
+                            break;
+                        case MAP:
+                            Map map = new HashMap();
+                            ISFSObject mapObj = object.getSFSObject(fieldName);
+                            for (String key : mapObj.getKeys()) {
+                                map.put(key, deserializeValue(
+                                        mapObj, fieldMeta.subFieldType, key, fieldMeta.type, fieldMeta.genericType
+                                ));
+                            }
+                            value = map;
                             break;
                         case ENTITY_ARRAY:
                             ISFSArray arrValue = object.getSFSArray(fieldName);
@@ -652,6 +699,37 @@ public class SFSSerializer extends BasicService implements TransportSerializer<I
             return instance;
         } catch (Exception e) {
             logAndThrow(new MetadataException(e));
+        }
+        return null;
+    }
+
+    private Object deserializeValue(ISFSObject object, FieldType fieldType,
+                                    String fieldName, Class<?> type, Class<?> genericType) throws ParseException {
+        switch (fieldType) {
+            case BOOL:
+                return object.getBool(fieldName);
+            case FLOAT:
+                return object.getFloat(fieldName);
+            case DOUBLE:
+                return object.getDouble(fieldName);
+            case INT:
+                return object.getInt(fieldName);
+            case LONG:
+                return object.getLong(fieldName);
+            case STRING:
+                return object.getUtfString(fieldName);
+            case ENTITY:
+                return deserialize((Class<? extends TransportObject>) type, object.getSFSObject(fieldName));
+            case DATE:
+                return new SimpleDateFormat(DEFAULT_DATE_FORMAT).parse(object.getUtfString(fieldName));
+            case ENUM:
+                return EnumUtil.fromString((Class<Enum>) type, object.getUtfString(fieldName));
+            case STRING_ARRAY:
+                return object.getUtfStringArray(fieldName);
+            case LONG_ARRAY:
+                return object.getLongArray(fieldName);
+            case ENUM_ARRAY:
+                return EnumUtil.fromStringCollection((Class<Enum>) genericType, object.getUtfStringArray(fieldName));
         }
         return null;
     }
