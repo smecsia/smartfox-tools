@@ -10,6 +10,8 @@
         <project.compiler.version>1.6</project.compiler.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven-jar-plugin.version>2.4</maven-jar-plugin.version>
+        <maven-antrun-plugin.version>1.7</maven-antrun-plugin.version>
+        <maven-surefire-plugin.version>2.9</maven-surefire-plugin.version>
         <smartfox.version>2.3.0</smartfox.version>
         <powermock.version>1.4.9</powermock.version>
     </properties>
